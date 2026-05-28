@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Compose — {{ app.company }}{% endblock %}
+{% block page_title %}Compose Email{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('application_detail', app_id=app.id) }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Back
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-envelope-plus me-2"></i>
+        Email to {{ app.contact_name or app.contact_email or 'Contact' }}
+        {% if app.company %} @ {{ app.company }}{% endif %}
+      </div>
+
+      <!-- Template picker -->
+      <div class="mb-3">
+        <label class="form-label small text-muted">Load Template</label>
+        <div class="d-flex gap-2">
+          <select id="templateSelect" class="form-select form-select-sm">
+            <option value="">— Choose template —</option>
+            {% for t in templates %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadTemplate()">Load</button>
+        </div>
+      </div>
+
+      <form method="post" id="composeForm">
+        <div class="mb-3">
+          <label class="form-label">To</label>
+          <input type="text" class="form-control" value="{{ app.contact_email or '' }}" readonly>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Subject <span class="text-muted small">(tracking tag auto-appended)</span></label>
+          <input type="text" name="subject" id="subjectInput" class="form-control" required
+            value="{% if app.email_subject %}{{ app.email_subject }}{% elif app.position and app.company %}Application for {{ app.position }} at {{ app.company }}{% endif %}"
+            placeholder="Subject line…">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Body</label>
+          <textarea name="body" id="bodyInput" class="form-control font-monospace" rows="16" required
+            placeholder="Dear {{ app.contact_name or 'Hiring Manager' }},&#10;&#10;I am writing to express…">{% if app.email_body %}{{ app.email_body }}{% endif %}</textarea>
+        </div>
+
+        <div class="d-flex align-items-end gap-3 flex-wrap">
+          <div>
+            <label class="form-label small">Schedule (optional)</label>
+            <input type="datetime-local" name="scheduled_at" id="scheduleAt" class="form-control form-control-sm">
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" name="action" value="send" class="btn btn-primary">
+              <i class="bi bi-send-fill"></i> Send Now
+            </button>
+            <button type="submit" name="action" value="schedule" class="btn btn-outline-warning"
+              onclick="requireSchedule(event)">
+              <i class="bi bi-calendar-plus"></i> Schedule
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card-panel mb-3">
+      <div class="panel-header"><i class="bi bi-info-circle me-2"></i>Tracking Info</div>
+      <dl class="detail-list">
+        <dt>UUID</dt>
+        <dd class="font-monospace small">{{ app.uuid }}</dd>
+        <dt>Tag in subject</dt>
+        <dd class="font-monospace small text-info">[TRK-{{ app.uuid }}]</dd>
+        <dt>Current status</dt>
+        <dd><span class="badge status-{{ app.status }}">{{ app.status }}</span></dd>
+      </dl>
+    </div>
+
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-magic me-2"></i>Placeholders</div>
+      <p class="small text-muted mb-2">You can use these in your template:</p>
+      <code class="d-block small mb-1">{company}</code>
+      <code class="d-block small mb-1">{position}</code>
+      <code class="d-block small mb-1">{contact_name}</code>
+      <button class="btn btn-xs btn-outline-secondary mt-2" onclick="fillPlaceholders()">
+        <i class="bi bi-magic"></i> Fill Placeholders
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const appData = {
+  company: {{ (app.company or '')|tojson }},
+  position: {{ (app.position or '')|tojson }},
+  contact_name: {{ (app.contact_name or 'Hiring Manager')|tojson }},
+};
+
+function loadTemplate() {
+  const id = document.getElementById('templateSelect').value;
+  if (!id) return;
+  fetch(`/api/template/${id}`)
+    .then(r => r.json())
+    .then(t => {
+      document.getElementById('subjectInput').value = t.subject || '';
+      document.getElementById('bodyInput').value = t.body || '';
+      fillPlaceholders();
+    });
+}
+
+function fillPlaceholders() {
+  ['subjectInput', 'bodyInput'].forEach(id => {
+    let el = document.getElementById(id);
+    el.value = el.value
+      .replaceAll('{company}', appData.company)
+      .replaceAll('{position}', appData.position)
+      .replaceAll('{contact_name}', appData.contact_name);
+  });
+}
+
+function requireSchedule(e) {
+  const dt = document.getElementById('scheduleAt').value;
+  if (!dt) {
+    e.preventDefault();
+    document.getElementById('scheduleAt').focus();
+    alert('Please pick a date & time to schedule the email.');
+  }
+}
+</script>
+{% endblock %}

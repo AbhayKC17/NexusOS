@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('new_application') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> New Application
+  </a>
+  <a href="{{ url_for('upload') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-upload"></i> Import Excel
+  </a>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Row -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-2-4">
+    <div class="stat-card">
+      <div class="stat-icon bg-primary bg-opacity-15 text-primary"><i class="bi bi-briefcase-fill"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ stats.total }}</div>
+        <div class="stat-label">Total Applications</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-2-4">
+    <div class="stat-card">
+      <div class="stat-icon bg-warning bg-opacity-15 text-warning"><i class="bi bi-clock-fill"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ stats.pending }}</div>
+        <div class="stat-label">Pending</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-2-4">
+    <div class="stat-card">
+      <div class="stat-icon bg-info bg-opacity-15 text-info"><i class="bi bi-send-fill"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ stats.sent }}</div>
+        <div class="stat-label">Sent</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-2-4">
+    <div class="stat-card">
+      <div class="stat-icon bg-success bg-opacity-15 text-success"><i class="bi bi-reply-fill"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ stats.replied }}</div>
+        <div class="stat-label">Replied</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-2-4">
+    <div class="stat-card">
+      <div class="stat-icon bg-purple bg-opacity-15 text-purple"><i class="bi bi-graph-up"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ stats.reply_rate }}%</div>
+        <div class="stat-label">Reply Rate</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Recent Applications -->
+  <div class="col-xl-8">
+    <div class="card-panel">
+      <div class="panel-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history me-2"></i>Recent Applications</span>
+        <a href="{{ url_for('applications') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Position</th>
+              <th>Status</th>
+              <th>Sent</th>
+              <th>Reply</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in recent %}
+            <tr>
+              <td class="fw-medium">{{ a.company or '—' }}</td>
+              <td class="text-muted small">{{ a.position or '—' }}</td>
+              <td>
+                <span class="badge status-{{ a.status }}">{{ a.status }}</span>
+              </td>
+              <td class="text-muted small">{{ a.sent_at[:10] if a.sent_at else '—' }}</td>
+              <td class="text-muted small">
+                {% if a.reply_date %}
+                  <i class="bi bi-check-circle-fill text-success"></i>
+                  {{ a.reply_date[:10] }}
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                <a href="{{ url_for('application_detail', app_id=a.id) }}" class="btn btn-xs btn-outline-secondary">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-4">No applications yet. <a href="{{ url_for('upload') }}">Import from Excel</a></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Replies + Scheduled -->
+  <div class="col-xl-4">
+    <div class="card-panel mb-4">
+      <div class="panel-header"><i class="bi bi-reply-all me-2"></i>Recent Replies</div>
+      {% for r in recent_replies %}
+      <div class="reply-card">
+        <div class="reply-meta">
+          <span class="fw-medium">{{ r.company or r.from_email }}</span>
+          <span class="text-muted small">{{ r.received_at[:10] if r.received_at }}</span>
+        </div>
+        <p class="text-muted small mb-0">{{ r.summary[:120] if r.summary else '—' }}…</p>
+      </div>
+      {% else %}
+      <p class="text-muted text-center py-3 mb-0">No replies synced yet.</p>
+      {% endfor %}
+      <a href="{{ url_for('replies') }}" class="btn btn-sm btn-outline-secondary w-100 mt-2">View All Replies</a>
+    </div>
+
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-calendar-event me-2"></i>Scheduled Emails</div>
+      <div class="text-center py-3">
+        <span class="display-6 fw-bold text-primary">{{ stats.scheduled }}</span>
+        <p class="text-muted mb-0 small">pending in queue</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

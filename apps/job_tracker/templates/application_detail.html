@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}{{ app.company }} — {{ app.position }}{% endblock %}
+{% block page_title %}Application Detail{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('compose', app_id=app.id) }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-envelope"></i> Compose Email
+  </a>
+  <a href="{{ url_for('edit_application', app_id=app.id) }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-pencil"></i> Edit
+  </a>
+  <a href="{{ url_for('applications') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Back
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Left: Application Info -->
+  <div class="col-lg-5">
+    <div class="card-panel mb-4">
+      <div class="panel-header"><i class="bi bi-person-lines-fill me-2"></i>Application Info</div>
+      <dl class="detail-list">
+        <dt>Company</dt><dd>{{ app.company or '—' }}</dd>
+        <dt>Position</dt><dd>{{ app.position or '—' }}</dd>
+        <dt>Contact Name</dt><dd>{{ app.contact_name or '—' }}</dd>
+        <dt>Contact Email</dt><dd>
+          {% if app.contact_email %}
+            <a href="mailto:{{ app.contact_email }}">{{ app.contact_email }}</a>
+          {% else %}—{% endif %}
+        </dd>
+        <dt>Status</dt><dd><span class="badge status-{{ app.status }}">{{ app.status }}</span></dd>
+        <dt>Applied Date</dt><dd>{{ app.applied_date or '—' }}</dd>
+        <dt>Sent At</dt><dd>{{ app.sent_at[:16].replace('T',' ') if app.sent_at else '—' }}</dd>
+        <dt>Source File</dt><dd class="small text-muted">{{ app.source_file or 'Manual' }}</dd>
+      </dl>
+    </div>
+
+    <div class="card-panel mb-4">
+      <div class="panel-header"><i class="bi bi-qr-code me-2"></i>Tracking UUID</div>
+      <div class="uuid-display">{{ app.uuid }}</div>
+      <p class="small text-muted mt-2 mb-0">
+        This UUID is embedded in every email sent for this application as <code>[TRK-{{ app.uuid[:8] }}…]</code>.
+        Replies containing it are automatically detected.
+      </p>
+    </div>
+
+    {% if app.notes %}
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-sticky me-2"></i>Notes</div>
+      <p class="mb-0 text-muted">{{ app.notes }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: Replies & Schedule -->
+  <div class="col-lg-7">
+    <!-- Replies -->
+    <div class="card-panel mb-4">
+      <div class="panel-header"><i class="bi bi-reply-all me-2"></i>Replies ({{ replies|length }})</div>
+      {% for r in replies %}
+      <div class="reply-card mb-3">
+        <div class="reply-meta">
+          <span class="fw-medium">{{ r.from_email or r.from_name }}</span>
+          <span class="text-muted small">{{ r.received_at[:16].replace('T',' ') if r.received_at }}</span>
+        </div>
+        <p class="small text-muted mb-2"><strong>Subject:</strong> {{ r.subject }}</p>
+        {% if r.summary %}
+        <div class="summary-box">
+          <span class="badge bg-primary me-1"><i class="bi bi-cpu"></i> AI Summary</span>
+          {{ r.summary }}
+        </div>
+        {% endif %}
+        <details class="mt-2">
+          <summary class="small text-muted" style="cursor:pointer">Show full email</summary>
+          <pre class="reply-body mt-2">{{ r.body }}</pre>
+        </details>
+      </div>
+      {% else %}
+      <p class="text-muted text-center py-3 mb-0">
+        No replies yet. <button onclick="syncReplies()" class="btn btn-sm btn-outline-primary">Sync Now</button>
+      </p>
+      {% endfor %}
+    </div>
+
+    <!-- Email sent -->
+    {% if app.email_subject %}
+    <div class="card-panel mb-4">
+      <div class="panel-header"><i class="bi bi-envelope-open me-2"></i>Last Email Sent</div>
+      <p class="small mb-2"><strong>Subject:</strong> {{ app.email_subject }} <code class="small">[TRK-{{ app.uuid }}]</code></p>
+      <pre class="reply-body">{{ app.email_body }}</pre>
+    </div>
+    {% endif %}
+
+    <!-- Scheduled -->
+    {% if scheduled %}
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-calendar-event me-2"></i>Scheduled Emails</div>
+      {% for s in scheduled %}
+      <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary">
+        <div>
+          <span class="fw-medium small">{{ s.email_subject }}</span><br>
+          <span class="text-muted small">{{ s.scheduled_at[:16].replace('T',' ') }} UTC</span>
+        </div>
+        <span class="badge bg-{{ 'success' if s.status == 'sent' else ('danger' if 'failed' in s.status else 'warning') }}">
+          {{ s.status }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

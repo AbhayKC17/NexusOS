@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}New Application{% endblock %}
+{% block page_title %}New Application{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('applications') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Back
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-plus-circle me-2"></i>Add Application Manually</div>
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label">Company <span class="text-danger">*</span></label>
+          <input name="company" class="form-control" required placeholder="Acme Corp">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Position <span class="text-danger">*</span></label>
+          <input name="position" class="form-control" required placeholder="Software Engineer">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Contact Email</label>
+          <input name="contact_email" type="email" class="form-control" placeholder="hr@acme.com">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Contact Name</label>
+          <input name="contact_name" class="form-control" placeholder="Jane Smith">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Notes</label>
+          <textarea name="notes" class="form-control" rows="3" placeholder="Referral from…, role found on…"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-plus-circle me-1"></i> Create Application
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

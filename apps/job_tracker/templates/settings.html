@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<form method="post">
+<div class="row g-4">
+
+  <!-- SMTP -->
+  <div class="col-lg-6">
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-send me-2"></i>SMTP — Outgoing Mail</div>
+      <p class="text-muted small mb-3">
+        <strong>Outlook:</strong> smtp.office365.com, port 587, TLS on<br>
+        <strong>Gmail:</strong> smtp.gmail.com, port 587, TLS on (use App Password)
+      </p>
+      <div class="mb-3">
+        <label class="form-label">SMTP Host</label>
+        <input name="smtp_host" class="form-control" value="{{ settings.smtp_host }}" placeholder="smtp.office365.com">
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-6">
+          <label class="form-label">Port</label>
+          <input name="smtp_port" class="form-control" value="{{ settings.smtp_port or 587 }}" placeholder="587">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Use STARTTLS</label>
+          <select name="smtp_tls" class="form-select">
+            <option value="true" {% if settings.smtp_tls != 'false' %}selected{% endif %}>Yes (recommended)</option>
+            <option value="false" {% if settings.smtp_tls == 'false' %}selected{% endif %}>No (SSL)</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Email Address</label>
+        <input name="smtp_user" type="email" class="form-control" value="{{ settings.smtp_user }}" placeholder="you@company.com">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password / App Password</label>
+        <input name="smtp_pass" type="password" class="form-control" placeholder="Leave blank to keep existing">
+      </div>
+      <div class="mb-0">
+        <label class="form-label">Display Name</label>
+        <input name="from_name" class="form-control" value="{{ settings.from_name }}" placeholder="Your Name">
+      </div>
+    </div>
+  </div>
+
+  <!-- IMAP -->
+  <div class="col-lg-6">
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-inbox me-2"></i>IMAP — Incoming Mail (Reply Tracking)</div>
+      <p class="text-muted small mb-3">
+        <strong>Outlook:</strong> outlook.office365.com, port 993<br>
+        <strong>Gmail:</strong> imap.gmail.com, port 993
+      </p>
+      <div class="mb-3">
+        <label class="form-label">IMAP Host</label>
+        <input name="imap_host" class="form-control" value="{{ settings.imap_host }}" placeholder="outlook.office365.com">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Port</label>
+        <input name="imap_port" class="form-control" value="{{ settings.imap_port or 993 }}" placeholder="993">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Email Address</label>
+        <input name="imap_user" type="email" class="form-control" value="{{ settings.imap_user }}" placeholder="you@company.com">
+      </div>
+      <div class="mb-0">
+        <label class="form-label">Password / App Password</label>
+        <input name="imap_pass" type="password" class="form-control" placeholder="Leave blank to keep existing">
+      </div>
+    </div>
+  </div>
+
+  <!-- Sender Profile -->
+  <div class="col-12">
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-person-badge me-2"></i>Sender Profile — used by Apple Mail Campaign</div>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Your Full Name</label>
+          <input name="sender_name" class="form-control" value="{{ settings.get('sender_name','') }}" placeholder="Abhay Kumar Choudhary">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Target Role</label>
+          <input name="sender_role" class="form-control" value="{{ settings.get('sender_role','') }}" placeholder="Product Manager - Digital Supply Chain">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">LinkedIn URL</label>
+          <input name="sender_linkedin" class="form-control" value="{{ settings.get('sender_linkedin','') }}" placeholder="https://linkedin.com/in/…">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Core Pitch (3–5 key strengths)</label>
+          <input name="sender_pitch" class="form-control" value="{{ settings.get('sender_pitch','') }}" placeholder="digital supply chain PM, Python automation, process improvement">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Resume PDF Path</label>
+          <input name="resume_path" class="form-control font-monospace" value="{{ settings.get('resume_path','') }}" placeholder="/Users/you/Abhay_Resume.pdf">
+          <div class="form-text">Absolute path to your resume file.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Local LLM -->
+  <div class="col-12">
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-cpu me-2"></i>Local LLM (llama.cpp) — Reply Summarizer</div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Model Path (.gguf file)</label>
+          <input name="llm_model_path" class="form-control font-monospace" value="{{ settings.llm_model_path }}"
+            placeholder="/Users/you/models/mistral-7b-instruct.Q4_K_M.gguf">
+          <div class="form-text">
+            Download models from <strong>HuggingFace</strong> (GGUF format).
+            Recommended: <code>Mistral-7B-Instruct-v0.2</code> or <code>Llama-3-8B-Instruct</code>.
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Context Window</label>
+          <input name="llm_context" class="form-control" value="{{ settings.llm_context or 2048 }}" placeholder="2048">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">GPU Layers (0 = CPU only)</label>
+          <input name="llm_gpu_layers" class="form-control" value="{{ settings.llm_gpu_layers or 0 }}" placeholder="0">
+          <div class="form-text">Set higher to offload layers to GPU (Metal on Mac)</div>
+        </div>
+      </div>
+      <div class="alert alert-info mt-3 mb-0 small">
+        <i class="bi bi-terminal me-1"></i>
+        Install: <code>pip install llama-cpp-python</code>.
+        For Metal (Apple Silicon) acceleration:
+        <code>CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python --force-reinstall --no-cache-dir</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <button type="submit" class="btn btn-primary px-4">
+      <i class="bi bi-save me-1"></i> Save Settings
+    </button>
+  </div>
+</div>
+</form>
+{% endblock %}

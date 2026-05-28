@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+{% block title %}Campaign Sender{% endblock %}
+{% block page_title %}Campaign — Apple Mail Bulk Sender{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Left: config + controls -->
+  <div class="col-lg-4">
+
+    <!-- Sender profile quick-view -->
+    <div class="card-panel mb-4">
+      <div class="panel-header"><i class="bi bi-person-badge me-2"></i>Sender Profile</div>
+      <dl class="detail-list">
+        <dt>Name</dt>
+        <dd>{{ sender_name or '<span class="text-danger">Not set</span>' | safe }}</dd>
+        <dt>Resume</dt>
+        <dd class="small font-monospace">
+          {% if resume_path %}
+            {% if resume_path[-4:] in ['.pdf','.PDF'] %}
+              <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
+            {% endif %}
+            {{ resume_path.split('/')[-1] }}
+          {% else %}
+            <span class="text-danger">Not configured</span>
+          {% endif %}
+        </dd>
+        <dt>Local LLM</dt>
+        <dd>
+          {% if llm_ready %}
+            <span class="badge bg-success"><i class="bi bi-cpu me-1"></i>Ready</span>
+          {% else %}
+            <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>No model set</span>
+            <a href="{{ url_for('settings') }}" class="small ms-1">Configure →</a>
+          {% endif %}
+        </dd>
+      </dl>
+      <div class="px-3 pb-3">
+        <a href="{{ url_for('settings') }}" class="btn btn-sm btn-outline-secondary w-100">
+          <i class="bi bi-gear me-1"></i> Edit Profile & LLM in Settings
+        </a>
+      </div>
+    </div>
+
+    <!-- Send options -->
+    <div class="card-panel mb-4">
+      <div class="panel-header"><i class="bi bi-sliders me-2"></i>Send Options</div>
+      <div class="p-3">
+        <div class="mb-3">
+          <label class="form-label">Delay between emails (seconds)</label>
+          <input type="number" id="sleepSeconds" value="10" min="0" max="120" class="form-control">
+          <div class="form-text">Recommended: 10–30 s to avoid spam flags</div>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="sendCareers" checked>
+          <label class="form-check-label" for="sendCareers">
+            Also send to <code>careers@domain</code>
+          </label>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="dryRun">
+          <label class="form-check-label" for="dryRun">
+            Dry run (print only, don't send)
+          </label>
+        </div>
+        <div class="d-grid gap-2">
+          <button class="btn btn-primary" onclick="sendSelected()">
+            <i class="bi bi-send-fill me-1"></i> Send Selected via Apple Mail
+          </button>
+          <button class="btn btn-outline-secondary" onclick="previewSelected()">
+            <i class="bi bi-eye me-1"></i> Preview First Selected
+          </button>
+        </div>
+        <div id="sendProgress" class="mt-3 d-none">
+          <div class="d-flex align-items-center gap-2 text-muted small">
+            <span class="spinner-border spinner-border-sm"></span>
+            Sending… Apple Mail will open for each email. Do not close Mail.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LLM intro preview box -->
+    <div class="card-panel d-none" id="previewBox">
+      <div class="panel-header"><i class="bi bi-magic me-2"></i>LLM-Generated Preview</div>
+      <div class="p-3">
+        <p class="small text-muted mb-1"><strong>To:</strong> <span id="previewTo">—</span></p>
+        <p class="small text-info mb-2"><strong>Intro:</strong> <span id="previewIntro">—</span></p>
+        <pre class="reply-body" id="previewBody" style="max-height:260px"></pre>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right: application table -->
+  <div class="col-lg-8">
+    <div class="card-panel">
+      <div class="panel-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-table me-2"></i>Applications ({{ apps|length }})</span>
+        <div class="d-flex gap-2">
+          <button class="btn btn-xs btn-outline-secondary" onclick="selectAll(true)">Select All</button>
+          <button class="btn btn-xs btn-outline-secondary" onclick="selectAll(false)">Deselect</button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width:36px"><input type="checkbox" id="masterCheck" onchange="selectAll(this.checked)"></th>
+              <th>Company</th>
+              <th>Position</th>
+              <th>Email → careers@</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="appTableBody">
+            {% for a in apps %}
+            <tr>
+              <td><input type="checkbox" class="app-check" value="{{ a.id }}"></td>
+              <td class="fw-medium">{{ a.company or '—' }}</td>
+              <td class="text-muted small">{{ a.position or '—' }}</td>
+              <td class="small">
+                {% if a.contact_email %}
+                  {{ a.contact_email }}<br>
+                  <span class="text-muted font-monospace" style="font-size:11px">→ careers@{{ a.contact_email.split('@')[1] if '@' in a.contact_email else '?' }}</span>
+                {% else %}
+                  <span class="text-danger">no email</span>
+                {% endif %}
+              </td>
+              <td><span class="badge status-{{ a.status }}">{{ a.status }}</span></td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" class="text-center text-muted py-5">
+                No pending applications.
+                <a href="{{ url_for('upload') }}">Import from Excel</a> or
+                <a href="{{ url_for('new_application') }}">add manually</a>.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Hidden form submitted programmatically -->
+<form id="bulkForm" method="post" action="{{ url_for('campaign') }}" class="d-none">
+  <input type="hidden" name="action" id="formAction" value="send">
+  <input type="hidden" name="sleep_seconds" id="formSleep" value="10">
+  <input type="hidden" name="dry_run" id="formDryRun" value="0">
+  <input type="hidden" name="send_to_careers" id="formCareers" value="1">
+  <div id="formIds"></div>
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function getCheckedIds() {
+  return [...document.querySelectorAll('.app-check:checked')].map(c => c.value);
+}
+
+function selectAll(v) {
+  document.querySelectorAll('.app-check').forEach(c => c.checked = v);
+  document.getElementById('masterCheck').checked = v;
+}
+
+function sendSelected() {
+  const ids = getCheckedIds();
+  if (!ids.length) { alert('Select at least one application.'); return; }
+  if (!confirm(`Send ${ids.length} email(s) via Apple Mail?`)) return;
+
+  document.getElementById('formAction').value = 'send';
+  document.getElementById('formSleep').value  = document.getElementById('sleepSeconds').value;
+  document.getElementById('formDryRun').value = document.getElementById('dryRun').checked ? '1' : '0';
+  document.getElementById('formCareers').value = document.getElementById('sendCareers').checked ? '1' : '0';
+
+  const container = document.getElementById('formIds');
+  container.innerHTML = '';
+  ids.forEach(id => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'app_ids'; inp.value = id;
+    container.appendChild(inp);
+  });
+
+  document.getElementById('sendProgress').classList.remove('d-none');
+  document.getElementById('bulkForm').submit();
+}
+
+function previewSelected() {
+  const ids = getCheckedIds();
+  if (!ids.length) { alert('Select an application to preview.'); return; }
+
+  const fd = new FormData();
+  fd.append('action', 'preview');
+  fd.append('app_id', ids[0]);
+
+  fetch('{{ url_for("campaign") }}', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { alert(d.error); return; }
+      document.getElementById('previewIntro').textContent = d.intro;
+      document.getElementById('previewBody').textContent  = d.body;
+      document.getElementById('previewTo').textContent    = d.careers_email;
+      document.getElementById('previewBox').classList.remove('d-none');
+    })
+    .catch(e => alert('Preview failed: ' + e));
+}
+</script>
+{% endblock %}

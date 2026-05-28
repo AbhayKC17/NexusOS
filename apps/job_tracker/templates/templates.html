@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}Email Templates{% endblock %}
+{% block page_title %}Email Templates{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- New template form -->
+  <div class="col-lg-5">
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-plus-square me-2"></i>New Template</div>
+      <form method="post" action="{{ url_for('new_template') }}">
+        <div class="mb-3">
+          <label class="form-label">Name</label>
+          <input name="name" class="form-control" required placeholder="e.g. Startup Application">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Subject</label>
+          <input name="subject" class="form-control" required placeholder="Application for {position} at {company}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Body</label>
+          <textarea name="body" class="form-control font-monospace" rows="12" required
+            placeholder="Dear {contact_name},&#10;&#10;…"></textarea>
+          <div class="form-text">Use {company}, {position}, {contact_name} as placeholders.</div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-save me-1"></i> Save Template
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Template list -->
+  <div class="col-lg-7">
+    {% for t in templates %}
+    <div class="card-panel mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0 fw-semibold">{{ t.name }}</h6>
+        <form method="post" action="{{ url_for('delete_template', tmpl_id=t.id) }}"
+              onsubmit="return confirm('Delete this template?')">
+          <button class="btn btn-xs btn-outline-danger"><i class="bi bi-trash"></i></button>
+        </form>
+      </div>
+      <p class="small text-info mb-1"><strong>Subject:</strong> {{ t.subject }}</p>
+      <pre class="reply-body">{{ t.body[:300] }}{% if t.body|length > 300 %}…{% endif %}</pre>
+    </div>
+    {% else %}
+    <div class="card-panel text-center py-5">
+      <p class="text-muted">No templates yet. Create one on the left.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

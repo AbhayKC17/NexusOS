@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Import Excel{% endblock %}
+{% block page_title %}Import from Excel / CSV{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Upload File</div>
+
+      <div id="dropZone" class="upload-zone" onclick="document.getElementById('fileInput').click()">
+        <i class="bi bi-cloud-upload display-4 text-muted mb-3"></i>
+        <p class="mb-1 fw-medium">Drag & drop or click to select</p>
+        <p class="text-muted small">.xlsx  .xls  .csv — max 32 MB</p>
+        <span id="fileName" class="badge bg-secondary mt-2"></span>
+      </div>
+
+      <form method="post" enctype="multipart/form-data" id="uploadForm">
+        <input type="file" id="fileInput" name="file" accept=".xlsx,.xls,.csv" class="d-none">
+        <button type="submit" class="btn btn-primary w-100 mt-3" id="uploadBtn" disabled>
+          <i class="bi bi-upload me-1"></i> Import File
+        </button>
+      </form>
+    </div>
+
+    <div class="card-panel mt-4">
+      <div class="panel-header"><i class="bi bi-table me-2"></i>Expected Column Names</div>
+      <p class="small text-muted mb-3">The importer detects columns automatically using these aliases (case-insensitive):</p>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered mb-0">
+          <thead><tr><th>Field</th><th>Accepted Column Names</th></tr></thead>
+          <tbody>
+            <tr><td>Company</td><td>company, company name, organisation, employer, firm</td></tr>
+            <tr><td>Position</td><td>position, role, job title, title, designation</td></tr>
+            <tr><td>Email</td><td>email, contact email, e-mail, email address, to</td></tr>
+            <tr><td>Name</td><td>name, contact name, contact person, hr name, recruiter</td></tr>
+            <tr><td>Date</td><td>date, applied date, applied on, application date</td></tr>
+            <tr><td>UUID</td><td>uuid, id, tracking id, uid</td></tr>
+            <tr><td>Notes</td><td>notes, note, comments, remark</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="alert alert-info mt-3 mb-0 small">
+        <i class="bi bi-lightbulb me-1"></i>
+        If your file has no UUID column, a new UUID is generated for each row automatically.
+        Duplicate UUIDs are detected and skipped on re-import.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const input = document.getElementById('fileInput');
+const btn   = document.getElementById('uploadBtn');
+const label = document.getElementById('fileName');
+const zone  = document.getElementById('dropZone');
+
+input.addEventListener('change', () => {
+  if (input.files.length) {
+    label.textContent = input.files[0].name;
+    btn.disabled = false;
+  }
+});
+
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('dragover');
+  const dt = new DataTransfer();
+  dt.items.add(e.dataTransfer.files[0]);
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change'));
+});
+</script>
+{% endblock %}

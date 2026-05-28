@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Edit — {{ app.company }}{% endblock %}
+{% block page_title %}Edit Application{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('application_detail', app_id=app.id) }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Back
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-pencil me-2"></i>Edit Application</div>
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label">Company</label>
+          <input name="company" class="form-control" value="{{ app.company or '' }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Position</label>
+          <input name="position" class="form-control" value="{{ app.position or '' }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Contact Email</label>
+          <input name="contact_email" type="email" class="form-control" value="{{ app.contact_email or '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Contact Name</label>
+          <input name="contact_name" class="form-control" value="{{ app.contact_name or '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            {% for s in ['pending','sent','replied','rejected','offer','interview'] %}
+            <option value="{{ s }}" {% if app.status == s %}selected{% endif %}>{{ s|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Notes</label>
+          <textarea name="notes" class="form-control" rows="3">{{ app.notes or '' }}</textarea>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-save me-1"></i> Save Changes
+          </button>
+          <form method="post" action="{{ url_for('delete_application', app_id=app.id) }}"
+                onsubmit="return confirm('Permanently delete this application and all its replies?')">
+            <button class="btn btn-outline-danger">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
