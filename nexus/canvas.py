@@ -1,15 +1,21 @@
 """
 nexus/canvas.py — Obsidian-style interactive knowledge graph.
 
+Interaction
+───────────
+  Zoom  : scroll wheel (any direction, no modifier needed)
+  Pan   : left-click drag on empty background, OR middle-button drag
+  Move  : left-click drag on a node
+  Select: left-click on a node
+  Open  : double-click on a node
+
 Visuals
 ───────
-  • Dot-grid background (#07070C)
+  • Dot-grid background
   • Glowing circular nodes — colour-coded by type, radial gradient fill
   • Bezier curved edges with gradient stroke + arrowhead
-  • Force-directed spring layout (Fruchterman-Reingold)
-  • Hover: node scales up + brighter glow
-  • Selected: white ring + pulsing glow via QTimer
-  • Zoom: Ctrl-scroll wheel   Pan: middle-button drag
+  • Force-directed spring layout — runs ONCE, then saves all positions so
+    the layout never runs again on subsequent startups
 """
 
 import math
@@ -23,7 +29,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QPainter, QPen, QBrush, QColor, QRadialGradient,
-    QPainterPath, QLinearGradient, QFont, QPolygonF, QAction,
+    QPainterPath, QLinearGradient, QFont, QPolygonF,
 )
 
 # ── Type → (hex color, icon glyph) ───────────────────────────────────────────
@@ -43,15 +49,16 @@ _TYPE = {
     "DEFAULT":    ("#6B7280", "○"),
 }
 
-_RADIUS   = 26
-_LABEL_Y  = _RADIUS + 6      # label baseline relative to node centre
-_GRID     = 30               # dot-grid spacing in scene units
+_RADIUS  = 26
+_GRID    = 30
 
-# Light-mode canvas colours
-_CANVAS_BG    = QColor("#F4F4FA")
-_GRID_DOT     = QColor(80, 80, 130, 28)
-_LABEL_FG     = QColor(30, 30, 50, 210)
-_GLOW_ALPHAS  = [0.14, 0.22, 0.38]   # more visible on light bg
+_CANVAS_BG   = QColor("#F4F4FA")
+_GRID_DOT    = QColor(80, 80, 130, 28)
+_LABEL_FG    = QColor(30, 30, 50, 210)
+_GLOW_ALPHAS = [0.14, 0.22, 0.38]
+
+_ZOOM_MIN = 0.08
+_ZOOM_MAX = 6.0
 
 
 def _type_color(t: str) -> QColor:
@@ -62,7 +69,7 @@ def _type_icon(t: str) -> str:
     return _TYPE.get(t, _TYPE["DEFAULT"])[1]
 
 
-# ── Signals carrier (QGraphicsItem cannot inherit QObject directly) ───────────
+# ── Signals carrier ───────────────────────────────────────────────────────────
 
 class _Sig(QObject):
     clicked        = pyqtSignal(dict)
@@ -76,29 +83,27 @@ class NodeItem(QGraphicsItem):
 
     def __init__(self, data: dict):
         super().__init__()
-        self.data    = data
-        self.sig     = _Sig()
-        self._vx     = random.uniform(-0.5, 0.5)
-        self._vy     = random.uniform(-0.5, 0.5)
-        self._hover  = False
-        self._sel    = False
-        self._pulse  = 0.0        # 0…1, driven by pulse timer
+        self.data   = data
+        self.sig    = _Sig()
+        self._vx    = random.uniform(-0.5, 0.5)
+        self._vy    = random.uniform(-0.5, 0.5)
+        self._hover = False
+        self._sel   = False
+        self._pulse = 0.0
         self._edges: list["EdgeItem"] = []
 
         px = data.get("pos_x", 0) or 0
         py = data.get("pos_y", 0) or 0
         self._has_saved_pos = (px != 0 or py != 0)
         if not self._has_saved_pos:
-            px = random.uniform(-250, 250)
-            py = random.uniform(-200, 200)
+            px = random.uniform(-280, 280)
+            py = random.uniform(-220, 220)
         self.setPos(px, py)
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.setAcceptHoverEvents(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-    # ── Qt overrides ─────────────────────────────────────────────────────────
 
     def boundingRect(self) -> QRectF:
         r = _RADIUS + 22
@@ -112,31 +117,27 @@ class NodeItem(QGraphicsItem):
 
     def paint(self, painter: QPainter, option, widget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        c   = _type_color(self.data.get("type", "DEFAULT"))
-        r   = _RADIUS * (1.12 if self._hover else 1.0)
+        c = _type_color(self.data.get("type", "DEFAULT"))
+        r = _RADIUS * (1.12 if self._hover else 1.0)
         glow_extra = 4 + self._pulse * 6 if self._sel else 0
 
-        # Outer glow rings
-        alphas = [
+        for ring_r, alpha in [
             (r + 18 + glow_extra, _GLOW_ALPHAS[0]),
             (r + 11, _GLOW_ALPHAS[1]),
             (r + 5,  _GLOW_ALPHAS[2]),
-        ]
-        for ring_r, alpha in alphas:
+        ]:
             g = QColor(c)
             g.setAlphaF(min(alpha * (1.5 if self._sel else 1.0), 1.0))
             painter.setBrush(QBrush(g))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(QPointF(0, 0), ring_r, ring_r)
 
-        # White selection ring
         if self._sel:
             ring = QColor(255, 255, 255, 80)
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.setPen(QPen(ring, 1.8))
             painter.drawEllipse(QPointF(0, 0), r + 5, r + 5)
 
-        # Radial gradient fill
         grad = QRadialGradient(QPointF(-r * 0.3, -r * 0.3), r * 1.6)
         grad.setColorAt(0.0, c.lighter(145))
         grad.setColorAt(1.0, c.darker(115))
@@ -144,7 +145,6 @@ class NodeItem(QGraphicsItem):
         painter.setPen(QPen(c.lighter(160), 1.4))
         painter.drawEllipse(QPointF(0, 0), r, r)
 
-        # Type icon
         painter.setPen(QPen(QColor(255, 255, 255, 230)))
         painter.setFont(QFont("SF Pro Display", 11, QFont.Weight.Bold))
         painter.drawText(
@@ -153,7 +153,6 @@ class NodeItem(QGraphicsItem):
             _type_icon(self.data.get("type", "DEFAULT")),
         )
 
-        # Label
         label = (self.data.get("label") or "")[:20]
         painter.setPen(QPen(_LABEL_FG))
         painter.setFont(QFont("SF Pro Display", 9, QFont.Weight.Medium))
@@ -163,17 +162,11 @@ class NodeItem(QGraphicsItem):
             label,
         )
 
-    # ── Interaction ───────────────────────────────────────────────────────────
-
     def hoverEnterEvent(self, event):
-        self._hover = True
-        self.update()
-        super().hoverEnterEvent(event)
+        self._hover = True; self.update(); super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
-        self._hover = False
-        self.update()
-        super().hoverLeaveEvent(event)
+        self._hover = False; self.update(); super().hoverLeaveEvent(event)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -185,17 +178,17 @@ class NodeItem(QGraphicsItem):
         super().mouseDoubleClickEvent(event)
 
     def mouseReleaseEvent(self, event):
-        self._has_saved_pos = True  # freeze this node in place after user drags it
+        self._has_saved_pos = True
         self.sig.moved.emit(self.data["id"], self.x(), self.y())
         super().mouseReleaseEvent(event)
 
     def contextMenuEvent(self, event):
         menu = QMenu()
         menu.setStyleSheet(
-            "QMenu { background: #1A1A28; border: 1px solid rgba(255,255,255,0.12); "
-            "color: #EFEFEF; border-radius: 8px; padding: 4px; }"
+            "QMenu { background: #FFFFFF; border: 1px solid rgba(0,0,0,0.12); "
+            "color: #1A1A1A; border-radius: 8px; padding: 4px; }"
             "QMenu::item { padding: 6px 18px; border-radius: 5px; }"
-            "QMenu::item:selected { background: rgba(99,102,241,0.25); }"
+            "QMenu::item:selected { background: rgba(0,103,192,0.12); color: #0067C0; }"
         )
         menu.addAction("Open in tab").triggered.connect(
             lambda: self.sig.double_clicked.emit(self.data)
@@ -209,15 +202,11 @@ class NodeItem(QGraphicsItem):
         )
         menu.exec(event.screenPos().toPoint())
 
-    # ── Selection / pulse ─────────────────────────────────────────────────────
-
     def set_selected(self, v: bool):
-        self._sel = v
-        self.update()
+        self._sel = v; self.update()
 
     def set_pulse(self, v: float):
-        self._pulse = v
-        self.update()
+        self._pulse = v; self.update()
 
 
 # ── Edge ──────────────────────────────────────────────────────────────────────
@@ -239,20 +228,18 @@ class EdgeItem(QGraphicsPathItem):
         t = self._tgt.scenePos()
         p = QPainterPath()
         p.moveTo(s)
-        # Horizontal S-curve control points
         mid_x = (s.x() + t.x()) * 0.5
         p.cubicTo(QPointF(mid_x, s.y()), QPointF(mid_x, t.y()), t)
         self.setPath(p)
 
     def paint(self, painter: QPainter, option, widget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        s   = self._src.scenePos()
-        t   = self._tgt.scenePos()
-        sc  = _type_color(self._src.data.get("type", "DEFAULT"))
-        tc  = _type_color(self._tgt.data.get("type", "DEFAULT"))
-        a   = 0.8 if self._hover else 0.50
+        s  = self._src.scenePos()
+        t  = self._tgt.scenePos()
+        sc = _type_color(self._src.data.get("type", "DEFAULT"))
+        tc = _type_color(self._tgt.data.get("type", "DEFAULT"))
+        a  = 0.8 if self._hover else 0.45
 
-        # Gradient stroke
         grad = QLinearGradient(s, t)
         sc.setAlphaF(a); grad.setColorAt(0, QColor(sc))
         tc.setAlphaF(a); grad.setColorAt(1, QColor(tc))
@@ -262,10 +249,9 @@ class EdgeItem(QGraphicsPathItem):
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawPath(self.path())
 
-        # Arrowhead near target
-        pp = self.path()
-        ap = pp.pointAtPercent(0.96)
-        bp = pp.pointAtPercent(0.88)
+        pp    = self.path()
+        ap    = pp.pointAtPercent(0.96)
+        bp    = pp.pointAtPercent(0.88)
         angle = math.atan2(ap.y() - bp.y(), ap.x() - bp.x())
         tip   = pp.pointAtPercent(1.0)
         sz    = 8
@@ -276,10 +262,9 @@ class EdgeItem(QGraphicsPathItem):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawPolygon(QPolygonF([tip, p1, p2]))
 
-        # Edge label (shown on hover)
         if self._hover and self._label:
             mid = pp.pointAtPercent(0.5)
-            painter.setPen(QPen(QColor(200, 200, 220, 180)))
+            painter.setPen(QPen(QColor(30, 30, 60, 180)))
             painter.setFont(QFont("SF Pro Display", 9))
             painter.drawText(
                 QRectF(mid.x() - 50, mid.y() - 12, 100, 16),
@@ -289,6 +274,7 @@ class EdgeItem(QGraphicsPathItem):
 
     def hoverEnterEvent(self, event):
         self._hover = True; self.update()
+
     def hoverLeaveEvent(self, event):
         self._hover = False; self.update()
 
@@ -307,21 +293,25 @@ class GraphCanvas(QGraphicsView):
         super().__init__(parent)
         self._scene = QGraphicsScene(self)
         self.setScene(self._scene)
-        self._scene.setSceneRect(-3000, -3000, 6000, 6000)
+        self._scene.setSceneRect(-4000, -4000, 8000, 8000)
 
-        self._nodes: dict[str, NodeItem]  = {}
-        self._edges: list[EdgeItem]       = []
-        self._selected: NodeItem | None   = None
-        self._connect_from: str | None    = None  # node id pending connection
+        self._nodes: dict[str, NodeItem] = {}
+        self._edges: list[EdgeItem]      = []
+        self._selected: NodeItem | None  = None
+        self._connect_from: str | None   = None
 
-        # Force layout — run at 30fps (33ms) instead of 55fps (18ms)
+        # Manual pan state
+        self._panning   = False
+        self._pan_start = QPointF()
+
+        # Force layout timer
         self._layout_timer = QTimer(self)
         self._layout_timer.timeout.connect(self._layout_step)
         self._iter = 0
 
-        # Pulse animation — 50ms is imperceptible from 40ms but uses 20% less CPU
-        self._pulse_timer  = QTimer(self)
-        self._pulse_phase  = 0.0
+        # Pulse animation
+        self._pulse_timer = QTimer(self)
+        self._pulse_phase = 0.0
         self._pulse_timer.timeout.connect(self._pulse_step)
         self._pulse_timer.start(50)
 
@@ -334,8 +324,9 @@ class GraphCanvas(QGraphicsView):
             QPainter.RenderHint.Antialiasing |
             QPainter.RenderHint.SmoothPixmapTransform
         )
-        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        # NoDrag: we handle pan manually so it doesn't interfere with node moves
+        self.setDragMode(QGraphicsView.DragMode.NoDrag)
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.SmartViewportUpdate)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -354,26 +345,84 @@ class GraphCanvas(QGraphicsView):
             for y in range(t, b, _GRID):
                 painter.drawEllipse(QPointF(x, y), 1.1, 1.1)
 
-    # ── Zoom & pan ────────────────────────────────────────────────────────────
+    # ── Zoom ──────────────────────────────────────────────────────────────────
 
     def wheelEvent(self, event):
-        factor = 1.14 if event.angleDelta().y() > 0 else 1 / 1.14
+        delta = event.angleDelta().y()
+        if delta == 0:
+            # Try horizontal delta (some trackpads send it this way)
+            delta = event.angleDelta().x()
+        if delta == 0:
+            return
+
+        factor = 1.15 if delta > 0 else 1 / 1.15
+        current_scale = self.transform().m11()
+
+        # Clamp zoom
+        if factor > 1 and current_scale >= _ZOOM_MAX:
+            return
+        if factor < 1 and current_scale <= _ZOOM_MIN:
+            return
+
         self.scale(factor, factor)
 
+    # ── Pan (left-click drag on background, or middle-button) ────────────────
+
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.MiddleButton:
-            self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         item = self.itemAt(event.pos())
+
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self._panning   = True
+            self._pan_start = event.pos()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            event.accept()
+            return
+
+        if event.button() == Qt.MouseButton.LeftButton and item is None:
+            # Click on empty background — start pan
+            self._panning   = True
+            self._pan_start = event.pos()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            self.background_clicked.emit()
+            if self._connect_from:
+                self._connect_from = None
+            event.accept()
+            return
+
+        # Click landed on an item — let Qt/scene handle it (node select / move)
         if item is None:
             self.background_clicked.emit()
             if self._connect_from:
                 self._connect_from = None
         super().mousePressEvent(event)
 
-    # ── Node / edge management ─────────────────────────────────────────────────
+    def mouseMoveEvent(self, event):
+        if self._panning:
+            delta = event.pos() - self._pan_start
+            self._pan_start = event.pos()
+            self.horizontalScrollBar().setValue(
+                self.horizontalScrollBar().value() - delta.x()
+            )
+            self.verticalScrollBar().setValue(
+                self.verticalScrollBar().value() - delta.y()
+            )
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._panning and event.button() in (
+            Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton
+        ):
+            self._panning = False
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    # ── Node / edge management ────────────────────────────────────────────────
 
     def load_graph(self, nodes: list[dict], edges: list[dict]):
-        """Replace current graph with data from the DB."""
         self._scene.clear()
         self._nodes.clear()
         self._edges.clear()
@@ -382,9 +431,14 @@ class GraphCanvas(QGraphicsView):
             self._add_node_item(nd)
         for ed in edges:
             self._add_edge_item(ed["src_id"], ed["tgt_id"], ed.get("label", ""))
-        # Only run layout when nodes lack saved positions (first run)
-        saved = sum(1 for n in nodes if (n.get("pos_x") or 0) != 0 or (n.get("pos_y") or 0) != 0)
-        if saved < len(nodes) * 0.5:
+
+        # Count how many nodes lack saved positions
+        unsaved = sum(
+            1 for n in nodes
+            if (n.get("pos_x") or 0) == 0 and (n.get("pos_y") or 0) == 0
+        )
+        if unsaved > 0:
+            # Run layout to place unsaved nodes, then persist all positions
             self._restart_layout()
 
     def add_node(self, data: dict) -> NodeItem:
@@ -398,9 +452,10 @@ class GraphCanvas(QGraphicsView):
     def remove_node(self, nid: str):
         item = self._nodes.pop(nid, None)
         if item:
-            # Remove attached edges
-            self._edges = [e for e in self._edges
-                           if e._src.data["id"] != nid and e._tgt.data["id"] != nid]
+            self._edges = [
+                e for e in self._edges
+                if e._src.data["id"] != nid and e._tgt.data["id"] != nid
+            ]
             self._scene.removeItem(item)
 
     def _add_node_item(self, data: dict) -> NodeItem:
@@ -412,7 +467,7 @@ class GraphCanvas(QGraphicsView):
         self._nodes[data["id"]] = item
         return item
 
-    def _add_edge_item(self, src_id: str, tgt_id: str, label: str = "") -> EdgeItem | None:
+    def _add_edge_item(self, src_id: str, tgt_id: str, label: str = "") -> "EdgeItem | None":
         src = self._nodes.get(src_id)
         tgt = self._nodes.get(tgt_id)
         if not src or not tgt:
@@ -436,7 +491,6 @@ class GraphCanvas(QGraphicsView):
             self._connect_from = data["id"]
             return
         if self._connect_from and self._connect_from != data["id"]:
-            # Complete connection
             src_id = self._connect_from
             tgt_id = data["id"]
             self._connect_from = None
@@ -461,11 +515,16 @@ class GraphCanvas(QGraphicsView):
         self._select(None)
 
     def fit(self):
-        if self._nodes:
-            self.fitInView(
-                self._scene.itemsBoundingRect().adjusted(-60, -60, 60, 60),
-                Qt.AspectRatioMode.KeepAspectRatio,
-            )
+        """Fit view to all nodes, but never zoom out past 20% scale."""
+        if not self._nodes:
+            return
+        rect = self._scene.itemsBoundingRect().adjusted(-80, -80, 80, 80)
+        self.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
+        # If fitting zoomed out too far, restore a reasonable minimum scale
+        if self.transform().m11() < 0.20:
+            self.resetTransform()
+            self.scale(0.20, 0.20)
+            self.centerOn(rect.center())
 
     # ── Pulse animation ───────────────────────────────────────────────────────
 
@@ -475,7 +534,6 @@ class GraphCanvas(QGraphicsView):
             self._selected.set_pulse(0.5 + 0.5 * math.sin(self._pulse_phase))
 
     # ── Force-directed layout ─────────────────────────────────────────────────
-    # Simplified Fruchterman-Reingold
 
     def _restart_layout(self):
         self._iter = 0
@@ -487,21 +545,24 @@ class GraphCanvas(QGraphicsView):
         if not nodes:
             self._layout_timer.stop()
             return
+
         self._iter += 1
         if self._iter > 400:
             self._layout_timer.stop()
+            # Persist all positions to DB so layout never runs again next startup
+            self._save_all_positions()
             return
 
-        K_REP    = 7500
-        K_SPR    = 0.05
-        REST     = 200
-        DAMP     = 0.80
-        G_CTR    = 0.009
-        cool     = max(0.2, 1.0 - self._iter / 400)
+        K_REP = 7500
+        K_SPR = 0.05
+        REST  = 200
+        DAMP  = 0.80
+        G_CTR = 0.009
+        cool  = max(0.2, 1.0 - self._iter / 400)
 
         forces: dict[str, list[float]] = {n.data["id"]: [0.0, 0.0] for n in nodes}
 
-        # Repulsion
+        # Repulsion between all node pairs
         for i, a in enumerate(nodes):
             for b in nodes[i + 1:]:
                 dx = a.x() - b.x()
@@ -527,10 +588,10 @@ class GraphCanvas(QGraphicsView):
             forces[b.data["id"]][0] -= fx
             forces[b.data["id"]][1] -= fy
 
-        # Apply
+        # Apply forces — skip frozen nodes
         for node in nodes:
             if node._hover or node._has_saved_pos:
-                continue  # freeze nodes under cursor or with saved DB positions
+                continue
             nid = node.data["id"]
             fx  = forces[nid][0] - node.x() * G_CTR
             fy  = forces[nid][1] - node.y() * G_CTR
@@ -538,3 +599,13 @@ class GraphCanvas(QGraphicsView):
             node._vy = (node._vy + fy) * DAMP * cool
             node.setPos(node.x() + node._vx * 0.12,
                         node.y() + node._vy * 0.12)
+
+    def _save_all_positions(self):
+        """Persist current positions for ALL nodes so layout won't re-run next startup."""
+        try:
+            from nexus.graph_db import update_node
+            for node in self._nodes.values():
+                node._has_saved_pos = True
+                update_node(node.data["id"], pos_x=round(node.x(), 1), pos_y=round(node.y(), 1))
+        except Exception as e:
+            print(f"[Canvas] Position save error: {e}")
