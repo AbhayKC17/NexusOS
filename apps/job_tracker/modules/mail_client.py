@@ -216,10 +216,29 @@ def send_email_from_account(
 ) -> None:
     """
     Send email using a specific connected Google account (by email address).
-    Useful when multiple Gmail accounts are connected.
+    Raises a clear error if the account is not connected or the token can't refresh.
     """
-    from modules.oauth_manager import get_google_token_for
-    token        = get_google_token_for(account_email)
+    from modules.oauth_manager import get_google_token_for, list_google_accounts
+    import base64 as _b64
+
+    # Sanity-check: is the account actually in the connected list?
+    connected = [a.get("email", "") for a in list_google_accounts()]
+    if account_email not in connected:
+        raise ValueError(
+            f"'{account_email}' is not connected.\n\n"
+            f"Connected accounts: {', '.join(connected) or 'none'}\n\n"
+            "Go to Settings → Email Accounts → Add / Re-connect Google Account."
+        )
+
+    try:
+        token = get_google_token_for(account_email)
+    except Exception as e:
+        raise ValueError(
+            f"Could not get OAuth token for '{account_email}': {e}\n\n"
+            "The token may have expired. Go to Settings → Email Accounts "
+            "and re-connect this Google account."
+        ) from e
+
     raw_xoauth2  = _xoauth2_raw(account_email, token)
     html_b       = build_html_body(body, tracking_key)
     valid_to     = [e for e in to_emails if e and "@" in e]
@@ -230,15 +249,25 @@ def send_email_from_account(
     from_addr    = f"{sender_name} <{account_email}>" if sender_name else account_email
     msg          = _build_mime(from_addr, valid_to, subject, body, html_b, attachment_path)
 
-    import base64 as _b64
     auth_str = _b64.b64encode(raw_xoauth2.encode("ascii")).decode("ascii")
 
-    import smtplib
     with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as srv:
-        srv.ehlo(); srv.starttls(); srv.ehlo()
+        srv.ehlo()
+        srv.starttls()
+        srv.ehlo()
         code, resp = srv.docmd("AUTH", f"XOAUTH2 {auth_str}")
         if code != 235:
-            raise smtplib.SMTPAuthenticationError(code, resp)
+            # Decode the error for a readable message
+            err_msg = resp.decode() if isinstance(resp, bytes) else str(resp)
+            raise smtplib.SMTPAuthenticationError(
+                code,
+                f"Gmail XOAUTH2 auth failed for {account_email} (code {code}): {err_msg}\n\n"
+                "This usually means:\n"
+                "• The OAuth token expired and couldn't refresh → re-connect the account\n"
+                "• Gmail blocked the OAuth app → check Google Account → Security → "
+                "Third-party apps\n"
+                "• Less Secure Apps setting blocked → use App Password in Settings instead"
+            )
         srv.sendmail(account_email, valid_to, msg.as_string())
 
 

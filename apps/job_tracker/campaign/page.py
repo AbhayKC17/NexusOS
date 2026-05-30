@@ -267,6 +267,13 @@ class CampaignPage(QWidget):
         self.senderCombo.currentIndexChanged.connect(self._on_sender_changed)
         lay.addWidget(self.senderCombo)
 
+        self.accountStatusLbl = QLabel("")
+        self.accountStatusLbl.setWordWrap(True)
+        self.accountStatusLbl.setStyleSheet(
+            "font-size:11px; background:transparent;"
+        )
+        lay.addWidget(self.accountStatusLbl)
+
         self.appleRow = QWidget()
         ar = QHBoxLayout(self.appleRow)
         ar.setContentsMargins(0, 0, 0, 0)
@@ -509,7 +516,7 @@ class CampaignPage(QWidget):
     def _on_sender_changed(self, idx):
         if not self._opts:
             return
-        label, mode, _ = self._opts[idx] if 0 <= idx < len(self._opts) else ("", "smtp", "")
+        label, mode, acct = self._opts[idx] if 0 <= idx < len(self._opts) else ("", "smtp", "")
         short = label.split("(")[0].strip() or "Mail"
         self.sendBtn.setText(f"▶  Run via {short}")
         is_apple = (mode == "apple_mail")
@@ -517,6 +524,30 @@ class CampaignPage(QWidget):
             self.appleRow.setVisible(is_apple)
             if is_apple and self.appleCombo.count() <= 1:
                 self._load_apple_accounts()
+
+        # Show connection status for the selected account
+        if not hasattr(self, "accountStatusLbl"):
+            return
+        if mode == "smtp" and acct:
+            try:
+                from modules.oauth_manager import list_google_accounts
+                connected = [a.get("email", "") for a in list_google_accounts()]
+                if acct in connected:
+                    self.accountStatusLbl.setText(f"✓  {acct}")
+                    self.accountStatusLbl.setStyleSheet(
+                        "font-size:11px; color:#107C10; background:transparent;"
+                    )
+                else:
+                    self.accountStatusLbl.setText(
+                        f"✗  {acct} not found — go to Settings → Re-connect"
+                    )
+                    self.accountStatusLbl.setStyleSheet(
+                        "font-size:11px; color:#C42B1C; background:transparent;"
+                    )
+            except Exception:
+                self.accountStatusLbl.setText("")
+        else:
+            self.accountStatusLbl.setText("")
 
     def _load_apple_accounts(self):
         from modules.apple_mail_sender import get_apple_mail_accounts
@@ -743,8 +774,9 @@ class CampaignPage(QWidget):
 
         for run in runs:
             rid = run["id"]
-            acct = run.get("apple_mail_account") or run.get("sender_mode", "")
-            label = f"#{rid} — {acct}"
+            acct  = run.get("apple_mail_account") or ""
+            mode  = run.get("sender_mode") or ""
+            label = f"#{rid}  {acct or mode}"
             if rid not in self._run_rows:
                 row = _RunRow(rid, label)
                 row.stopBtn.clicked.connect(lambda _, r=rid: self._stop_run(r))
@@ -920,7 +952,13 @@ class CampaignPage(QWidget):
         delay           = self.delaySpin.value()
         idx             = self.senderCombo.currentIndex()
         via             = self._opts[idx][0] if self._opts else "Mail"
-        apple_acct      = self.appleCombo.currentData() or "" if mode == "apple_mail" else ""
+        # For apple_mail: store the mailbox account.
+        # For smtp/outlook: store the email address in the same field so the
+        # campaign_runner thread can look up which account to send from.
+        if mode == "apple_mail":
+            apple_acct = self.appleCombo.currentData() or ""
+        else:
+            apple_acct = g_acct  # Gmail or Outlook email — stored so runner can use it
 
         # Collect checked IDs (optional — if none checked, run uses pending queue)
         checked = self._checked_ids()

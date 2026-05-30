@@ -161,13 +161,20 @@ def _run_thread(run_id: int, stop_evt: threading.Event) -> None:
             tkey = _tkey(subject)
 
             if dry_run:
-                print(f"[DRY RUN run#{run_id}] To: {to_emails} | {subject}")
+                print(f"[DRY RUN run#{run_id}] To: {to_emails} | Sender: {account} | {subject}")
             elif sender_mode == "outlook":
                 from modules.outlook_sender import send_via_outlook
                 send_via_outlook(to_emails, subject, body, resume, tkey)
             elif sender_mode == "smtp":
                 from modules.mail_client import send_email as _smtp
-                _smtp(to_emails, subject, body, attachment_path=resume, tracking_key=tkey)
+                # Pass the specific account email so the correct OAuth token is used.
+                # `account` is the Gmail address stored in apple_mail_account field.
+                _smtp(
+                    to_emails, subject, body,
+                    attachment_path=resume,
+                    tracking_key=tkey,
+                    from_account_email=account or None,
+                )
             else:
                 send_via_apple_mail(to_emails, subject, body, resume, tkey,
                                     from_account=account)
