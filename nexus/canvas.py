@@ -85,7 +85,8 @@ class NodeItem(QGraphicsItem):
 
         px = data.get("pos_x", 0) or 0
         py = data.get("pos_y", 0) or 0
-        if px == 0 and py == 0:
+        self._has_saved_pos = (px != 0 or py != 0)
+        if not self._has_saved_pos:
             px = random.uniform(-250, 250)
             py = random.uniform(-200, 200)
         self.setPos(px, py)
@@ -182,7 +183,7 @@ class NodeItem(QGraphicsItem):
         super().mouseDoubleClickEvent(event)
 
     def mouseReleaseEvent(self, event):
-        # Persist updated position after drag
+        self._has_saved_pos = True  # freeze this node in place after user drags it
         self.sig.moved.emit(self.data["id"], self.x(), self.y())
         super().mouseReleaseEvent(event)
 
@@ -379,7 +380,10 @@ class GraphCanvas(QGraphicsView):
             self._add_node_item(nd)
         for ed in edges:
             self._add_edge_item(ed["src_id"], ed["tgt_id"], ed.get("label", ""))
-        self._restart_layout()
+        # Only run layout when nodes lack saved positions (first run)
+        saved = sum(1 for n in nodes if (n.get("pos_x") or 0) != 0 or (n.get("pos_y") or 0) != 0)
+        if saved < len(nodes) * 0.5:
+            self._restart_layout()
 
     def add_node(self, data: dict) -> NodeItem:
         item = self._add_node_item(data)
@@ -523,8 +527,8 @@ class GraphCanvas(QGraphicsView):
 
         # Apply
         for node in nodes:
-            if node._hover:
-                continue  # freeze node under cursor
+            if node._hover or node._has_saved_pos:
+                continue  # freeze nodes under cursor or with saved DB positions
             nid = node.data["id"]
             fx  = forces[nid][0] - node.x() * G_CTR
             fy  = forces[nid][1] - node.y() * G_CTR

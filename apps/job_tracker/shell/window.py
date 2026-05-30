@@ -122,7 +122,7 @@ class _StatusFooter(QWidget):
         self.modelDot = QLabel("  ◉  Loading model…")
         self.modelDot.setObjectName("modelStatus")
         self.modelDot.setStyleSheet(
-            "color: #FCE100; font-size: 11px; background: transparent; padding: 5px 14px;"
+            "color: #9D5D00; font-size: 11px; background: transparent; padding: 5px 14px;"
         )
 
         self.syncDot = QLabel("  Auto-sync: every 15 min")
