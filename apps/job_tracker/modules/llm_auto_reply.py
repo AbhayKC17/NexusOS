@@ -17,10 +17,21 @@ def generate_reply_draft(
     position: str = "",
 ) -> str | None:
     """
-    Generate a professional reply draft to a job application response.
-    Returns None if LLM is not loaded (caller should retry later or show fallback).
-    Returns a non-empty string on success.
+    Generate a professional reply draft.
+    Tries Groq (cloud, fast, free tier) first; falls back to local Mistral 7B.
+    Returns None if neither is available.
     """
+    # ── Groq (preferred — no GPU needed) ──────────────────────────────────────
+    try:
+        from modules.groq_client import is_configured, generate_reply_draft as _groq
+        if is_configured():
+            draft = _groq(reply_body, original_subject, original_body, company_name, position)
+            if draft and len(draft) >= 60:
+                return draft
+    except Exception:
+        pass
+
+    # ── Local Mistral 7B (fallback) ───────────────────────────────────────────
     from modules.llm_summarizer import _get_llm
     llm = _get_llm()
 

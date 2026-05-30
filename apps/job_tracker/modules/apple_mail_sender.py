@@ -176,10 +176,62 @@ def generate_personalized_intro(
     website: str = "",
     city: str = "",
     country: str = "",
+    investors: str = "",
+    funding: str = "",
+    employees: str = "",
 ) -> str:
-    from modules.llm_summarizer import _get_llm
-
+    """
+    Generate a 1-2 sentence personalised opening line for a cold email.
+    Uses Groq (cloud) → local Mistral 7B → static fallback.
+    All available startup context is passed to the AI so it can reference
+    specifics (sector, location, funding stage, investors, etc.).
+    """
     p = _profile()
+
+    # Build a rich context block shared by both AI paths
+    ctx_lines = [f"Company: {company_name}"]
+    if short_desc:              ctx_lines.append(f"About: {short_desc[:200]}")
+    if long_desc:               ctx_lines.append(f"Details: {long_desc[:300]}")
+    if categories:              ctx_lines.append(f"Sector: {categories[:120]}")
+    if city or country:         ctx_lines.append(f"Location: {', '.join(filter(None,[city,country]))}")
+    if investors:               ctx_lines.append(f"Investors: {investors[:120]}")
+    if funding:                 ctx_lines.append(f"Funding: {funding}")
+    if employees:               ctx_lines.append(f"Team size: {employees}")
+    if website:                 ctx_lines.append(f"Website: {website}")
+    context = "\n".join(ctx_lines)
+
+    # ── Groq (cloud, preferred — no GPU needed) ───────────────────────────────
+    try:
+        from modules.groq_client import is_configured, chat as _groq_chat
+        if is_configured():
+            msgs = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You write opening lines for cold job-application emails. "
+                        "1-2 sentences, max 35 words. Be specific about THIS company. "
+                        "No Hi/Hello, no quotes, no sign-off, no bullet points."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Candidate: {p['name']}, {p['role']}\n"
+                        f"Skills: {p['pitch']}\n\n"
+                        f"{context}\n\n"
+                        "Write one compelling opening line that references something specific "
+                        "about this company and connects the candidate's background to their work:"
+                    ),
+                },
+            ]
+            result = _groq_chat(msgs, max_tokens=70, temperature=0.72)
+            if result and len(result) > 20:
+                return result.strip().strip('"')
+    except Exception:
+        pass
+
+    # ── Local Mistral 7B ──────────────────────────────────────────────────────
+    from modules.llm_summarizer import _get_llm
     llm = _get_llm()
 
     if llm is None:
@@ -188,26 +240,19 @@ def generate_personalized_intro(
             f"my experience in {p['pitch']} could add real value to your team."
         )
 
-    info = f"Company: {company_name}\n"
-    if short_desc:   info += f"About: {short_desc}\n"
-    if long_desc:    info += f"Details: {long_desc[:300]}\n"
-    if categories:   info += f"Sector: {categories}\n"
-    if city or country: info += f"Location: {city}, {country}\n"
-
-    # No leading <s> — llama_cpp adds BOS token automatically
-    prompt = f"""[INST] Write exactly 1-2 sentences (max 30 words) as an opening line for a cold job-application email.
-
-Candidate: {p['name']}, {p['role']}, strengths: {p['pitch']}
-
-{info}
-Requirements:
-- Show genuine interest in THIS company specifically
-- Connect the candidate's background to their work
-- Do NOT start with Hi/Hello
-- No quotes, no sign-off, no bullet points
-- One option only
-
-Opening line: [/INST]"""
+    prompt = (
+        f"[INST] Write exactly 1-2 sentences (max 30 words) as an opening line "
+        f"for a cold job-application email.\n\n"
+        f"Candidate: {p['name']}, {p['role']}, strengths: {p['pitch']}\n\n"
+        f"{context}\n\n"
+        f"Requirements:\n"
+        f"- Show genuine interest in THIS company specifically\n"
+        f"- Reference their sector, location, or funding if known\n"
+        f"- Connect candidate background to their work\n"
+        f"- Do NOT start with Hi/Hello\n"
+        f"- No quotes, no sign-off, no bullet points\n\n"
+        f"Opening line: [/INST]"
+    )
 
     try:
         out = llm(prompt, max_tokens=80, temperature=0.7,
@@ -257,6 +302,7 @@ def run_bulk_campaign(
     send_to_careers: bool = True,
     sender_mode: str = "apple_mail",   # "apple_mail" | "outlook" | "smtp"
     apple_mail_account: str = "",
+    google_account_email: str = "",    # specific Gmail account to send from
     progress_callback=None,
 ) -> dict:
     p = _profile()
@@ -289,8 +335,27 @@ def run_bulk_campaign(
                 to_emails.append(careers)
 
         try:
+            import json as _json
+            raw: dict = {}
+            if app.get("raw_data"):
+                try:
+                    raw = _json.loads(app["raw_data"])
+                except Exception:
+                    pass
+
             position = (app["position"] or "").strip()
-            intro    = generate_personalized_intro(company_name=company, short_desc=app["notes"] or "")
+            intro    = generate_personalized_intro(
+                company_name=company,
+                short_desc=raw.get("short_description") or app["notes"] or "",
+                long_desc=raw.get("long_description") or "",
+                categories=raw.get("categories") or "",
+                website=raw.get("homepage_url") or "",
+                city=raw.get("city") or "",
+                country=raw.get("country") or "",
+                investors=str(raw.get("investors") or ""),
+                funding=str(raw.get("total_funding_usd") or ""),
+                employees=str(raw.get("num_employees") or ""),
+            )
             if position:
                 subject = f"Exploring {position} opportunities at {company or 'your company'}"
             else:
@@ -309,7 +374,8 @@ def run_bulk_campaign(
             elif sender_mode == "smtp":
                 from modules.mail_client import send_email as _smtp_send
                 _smtp_send(to_emails, subject, body,
-                           attachment_path=resume_path, tracking_key=tracking_key)
+                           attachment_path=resume_path, tracking_key=tracking_key,
+                           from_account_email=google_account_email or None)
             else:
                 send_via_apple_mail(to_emails, subject, body, resume_path, tracking_key,
                                     from_account=apple_mail_account)

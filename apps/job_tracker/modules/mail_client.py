@@ -206,6 +206,42 @@ def _build_mime(from_addr, valid_to, subject, body, html_body, attachment_path):
     return msg
 
 
+def send_email_from_account(
+    account_email: str,
+    to_emails: list,
+    subject: str,
+    body: str,
+    attachment_path: str = None,
+    tracking_key: str = "",
+) -> None:
+    """
+    Send email using a specific connected Google account (by email address).
+    Useful when multiple Gmail accounts are connected.
+    """
+    from modules.oauth_manager import get_google_token_for
+    token        = get_google_token_for(account_email)
+    raw_xoauth2  = _xoauth2_raw(account_email, token)
+    html_b       = build_html_body(body, tracking_key)
+    valid_to     = [e for e in to_emails if e and "@" in e]
+    if not valid_to:
+        raise ValueError("No valid recipient email addresses.")
+
+    sender_name  = get_setting("from_name", "") or get_setting("sender_name", "")
+    from_addr    = f"{sender_name} <{account_email}>" if sender_name else account_email
+    msg          = _build_mime(from_addr, valid_to, subject, body, html_b, attachment_path)
+
+    import base64 as _b64
+    auth_str = _b64.b64encode(raw_xoauth2.encode("ascii")).decode("ascii")
+
+    import smtplib
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as srv:
+        srv.ehlo(); srv.starttls(); srv.ehlo()
+        code, resp = srv.docmd("AUTH", f"XOAUTH2 {auth_str}")
+        if code != 235:
+            raise smtplib.SMTPAuthenticationError(code, resp)
+        srv.sendmail(account_email, valid_to, msg.as_string())
+
+
 def send_email(
     to_emails: list,
     subject: str,
@@ -213,12 +249,19 @@ def send_email(
     attachment_path: str = None,
     tracking_key: str = "",
     html_body: str = None,
+    from_account_email: str = None,
 ) -> None:
     """
     Send email via SMTP.
     Uses OAuth2 / XOAUTH2 when a Google or Microsoft account is connected;
     falls back to password SMTP if not.
     """
+    # Shortcut: if a specific Google account is requested, delegate directly
+    if from_account_email:
+        return send_email_from_account(
+            from_account_email, to_emails, subject, body, attachment_path, tracking_key
+        )
+
     if html_body is None:
         html_body = build_html_body(body, tracking_key)
 

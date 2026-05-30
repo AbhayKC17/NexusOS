@@ -1,14 +1,147 @@
 {% extends 'base.html' %}
-{% block title %}Campaign Sender{% endblock %}
-{% block page_title %}Campaign — Apple Mail Bulk Sender{% endblock %}
+{% block title %}Campaign{% endblock %}
+{% block page_title %}Campaign Sender{% endblock %}
 
 {% block content %}
+
+<!-- ── Tabs ─────────────────────────────────────────────────────────────── -->
+<ul class="nav nav-tabs mb-4" id="campaignTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="runs-tab" data-bs-toggle="tab"
+            data-bs-target="#runsPane" type="button">
+      <i class="bi bi-play-circle me-1"></i> Automation Runs
+      {% if pending_count %}<span class="badge bg-warning text-dark ms-1">{{ pending_count }} pending</span>{% endif %}
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="quick-tab" data-bs-toggle="tab"
+            data-bs-target="#quickPane" type="button">
+      <i class="bi bi-send me-1"></i> Quick Send
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="ai-tab" data-bs-toggle="tab"
+            data-bs-target="#aiPane" type="button">
+      <i class="bi bi-magic me-1"></i> AI Composer
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     TAB 1 — AUTOMATION RUNS
+     ════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-pane fade show active" id="runsPane" role="tabpanel">
+
+  <!-- Stats bar -->
+  <div class="row g-3 mb-4">
+    <div class="col-auto">
+      <div class="card-panel px-4 py-2 d-flex align-items-center gap-2">
+        <i class="bi bi-hourglass-split text-warning"></i>
+        <span class="fw-semibold" id="statPending">{{ pending_count }}</span>
+        <span class="text-muted small">pending</span>
+      </div>
+    </div>
+    <div class="col-auto">
+      <div class="card-panel px-4 py-2 d-flex align-items-center gap-2">
+        <i class="bi bi-arrow-repeat text-info"></i>
+        <span class="fw-semibold" id="statInProgress">{{ in_progress_count }}</span>
+        <span class="text-muted small">in progress</span>
+      </div>
+    </div>
+    <div class="col-auto ms-auto">
+      <button class="btn btn-primary" onclick="openNewRunModal()">
+        <i class="bi bi-plus-circle me-1"></i> New Run
+      </button>
+    </div>
+  </div>
+
+  <!-- Run cards -->
+  <div id="runList" class="mb-4">
+    {% if not runs %}
+      <div class="card-panel p-4 text-center text-muted" id="noRunsMsg">
+        No runs yet. Click <strong>New Run</strong> to create one.<br>
+        <small>You can run Apple Mail and Gmail simultaneously — they coordinate automatically to avoid duplicates.</small>
+      </div>
+    {% else %}
+      {% for run in runs %}
+      <div class="card-panel mb-2" id="run-card-{{ run.id }}">
+        <div class="p-3 d-flex align-items-center gap-3 flex-wrap">
+          <div class="flex-grow-1">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <strong>{{ run.name }}</strong>
+              <span class="badge run-status-{{ run.status }}">{{ run.status }}</span>
+              <span class="badge bg-secondary">{{ run.sender_mode }}</span>
+              {% if run.dry_run %}<span class="badge bg-warning text-dark">dry run</span>{% endif %}
+            </div>
+            <div class="small text-muted d-flex gap-3">
+              <span><i class="bi bi-check-circle text-success me-1"></i>Sent: <strong id="run-sent-{{ run.id }}">{{ run.sent }}</strong></span>
+              <span><i class="bi bi-x-circle text-danger me-1"></i>Failed: <strong id="run-failed-{{ run.id }}">{{ run.failed }}</strong></span>
+              <span><i class="bi bi-skip-forward text-muted me-1"></i>Skipped: <strong id="run-skipped-{{ run.id }}">{{ run.skipped }}</strong></span>
+              {% if run.apple_mail_account %}<span class="font-monospace">{{ run.apple_mail_account }}</span>{% endif %}
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            {% if run.is_active %}
+              <button class="btn btn-xs btn-danger" onclick="stopRun({{ run.id }})">
+                <i class="bi bi-stop-fill me-1"></i>Stop
+              </button>
+            {% else %}
+              <button class="btn btn-xs btn-success" onclick="startRun({{ run.id }})">
+                <i class="bi bi-play-fill me-1"></i>Start
+              </button>
+            {% endif %}
+            <button class="btn btn-xs btn-outline-danger" onclick="deleteRun({{ run.id }})">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- Application table -->
+  <div class="card-panel">
+    <div class="panel-header d-flex justify-content-between">
+      <span><i class="bi bi-table me-2"></i>Applications</span>
+      <span class="small text-muted">Status shown for pending / in-progress / sent</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 small">
+        <thead>
+          <tr>
+            <th>Company</th><th>Position</th><th>Email</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in apps %}
+          <tr>
+            <td class="fw-medium">{{ a.company or '—' }}</td>
+            <td class="text-muted">{{ a.position or '—' }}</td>
+            <td class="font-monospace small">{{ a.contact_email or '—' }}</td>
+            <td><span class="badge status-{{ a.status }}">{{ a.status }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted py-4">No applications found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /runsPane -->
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     TAB 2 — QUICK SEND (original layout)
+     ════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-pane fade" id="quickPane" role="tabpanel">
 <div class="row g-4">
 
-  <!-- Left: config + controls -->
   <div class="col-lg-4">
-
-    <!-- Sender profile quick-view -->
+    <!-- Sender profile -->
     <div class="card-panel mb-4">
       <div class="panel-header"><i class="bi bi-person-badge me-2"></i>Sender Profile</div>
       <dl class="detail-list">
@@ -17,9 +150,7 @@
         <dt>Resume</dt>
         <dd class="small font-monospace">
           {% if resume_path %}
-            {% if resume_path[-4:] in ['.pdf','.PDF'] %}
-              <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
-            {% endif %}
+            {% if resume_path[-4:] in ['.pdf','.PDF'] %}<i class="bi bi-file-earmark-pdf text-danger me-1"></i>{% endif %}
             {{ resume_path.split('/')[-1] }}
           {% else %}
             <span class="text-danger">Not configured</span>
@@ -30,14 +161,14 @@
           {% if llm_ready %}
             <span class="badge bg-success"><i class="bi bi-cpu me-1"></i>Ready</span>
           {% else %}
-            <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>No model set</span>
+            <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>No model</span>
             <a href="{{ url_for('settings') }}" class="small ms-1">Configure →</a>
           {% endif %}
         </dd>
       </dl>
       <div class="px-3 pb-3">
         <a href="{{ url_for('settings') }}" class="btn btn-sm btn-outline-secondary w-100">
-          <i class="bi bi-gear me-1"></i> Edit Profile & LLM in Settings
+          <i class="bi bi-gear me-1"></i> Edit Profile & LLM
         </a>
       </div>
     </div>
@@ -49,19 +180,15 @@
         <div class="mb-3">
           <label class="form-label">Delay between emails (seconds)</label>
           <input type="number" id="sleepSeconds" value="10" min="0" max="120" class="form-control">
-          <div class="form-text">Recommended: 10–30 s to avoid spam flags</div>
+          <div class="form-text">Recommended: 10–30 s</div>
         </div>
         <div class="form-check mb-2">
           <input class="form-check-input" type="checkbox" id="sendCareers" checked>
-          <label class="form-check-label" for="sendCareers">
-            Also send to <code>careers@domain</code>
-          </label>
+          <label class="form-check-label" for="sendCareers">Also send to <code>careers@domain</code></label>
         </div>
         <div class="form-check mb-3">
           <input class="form-check-input" type="checkbox" id="dryRun">
-          <label class="form-check-label" for="dryRun">
-            Dry run (print only, don't send)
-          </label>
+          <label class="form-check-label" for="dryRun">Dry run (don't actually send)</label>
         </div>
         <div class="d-grid gap-2">
           <button class="btn btn-primary" onclick="sendSelected()">
@@ -74,25 +201,24 @@
         <div id="sendProgress" class="mt-3 d-none">
           <div class="d-flex align-items-center gap-2 text-muted small">
             <span class="spinner-border spinner-border-sm"></span>
-            Sending… Apple Mail will open for each email. Do not close Mail.
+            Sending… Apple Mail will open for each email.
           </div>
         </div>
       </div>
     </div>
 
-    <!-- LLM intro preview box -->
+    <!-- Preview box -->
     <div class="card-panel d-none" id="previewBox">
-      <div class="panel-header"><i class="bi bi-magic me-2"></i>LLM-Generated Preview</div>
+      <div class="panel-header"><i class="bi bi-magic me-2"></i>LLM Preview</div>
       <div class="p-3">
         <p class="small text-muted mb-1"><strong>To:</strong> <span id="previewTo">—</span></p>
         <p class="small text-info mb-2"><strong>Intro:</strong> <span id="previewIntro">—</span></p>
         <pre class="reply-body" id="previewBody" style="max-height:260px"></pre>
       </div>
     </div>
-
   </div>
 
-  <!-- Right: application table -->
+  <!-- Application table with checkboxes -->
   <div class="col-lg-8">
     <div class="card-panel">
       <div class="panel-header d-flex justify-content-between align-items-center">
@@ -107,10 +233,7 @@
           <thead>
             <tr>
               <th style="width:36px"><input type="checkbox" id="masterCheck" onchange="selectAll(this.checked)"></th>
-              <th>Company</th>
-              <th>Position</th>
-              <th>Email → careers@</th>
-              <th>Status</th>
+              <th>Company</th><th>Position</th><th>Email → careers@</th><th>Status</th>
             </tr>
           </thead>
           <tbody id="appTableBody">
@@ -122,7 +245,9 @@
               <td class="small">
                 {% if a.contact_email %}
                   {{ a.contact_email }}<br>
-                  <span class="text-muted font-monospace" style="font-size:11px">→ careers@{{ a.contact_email.split('@')[1] if '@' in a.contact_email else '?' }}</span>
+                  <span class="text-muted font-monospace" style="font-size:11px">
+                    → careers@{{ a.contact_email.split('@')[1] if '@' in a.contact_email else '?' }}
+                  </span>
                 {% else %}
                   <span class="text-danger">no email</span>
                 {% endif %}
@@ -144,9 +269,212 @@
     </div>
   </div>
 
+</div><!-- /row -->
+</div><!-- /quickPane -->
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     TAB 3 — AI COMPOSER
+     ════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-pane fade" id="aiPane" role="tabpanel">
+<div class="row g-4">
+
+  <!-- Left: settings -->
+  <div class="col-lg-4">
+    <div class="card-panel mb-4">
+      <div class="panel-header"><i class="bi bi-robot me-2"></i>AI Composer Settings</div>
+      <div class="p-3">
+
+        <div class="mb-3">
+          <label class="form-label">Sender</label>
+          <select id="aiSenderMode" class="form-select" onchange="toggleAiAccount()">
+            <option value="apple_mail">Apple Mail</option>
+            <option value="smtp">Gmail / SMTP</option>
+            <option value="outlook">Outlook / Graph</option>
+          </select>
+        </div>
+
+        <div class="mb-3 d-none" id="aiAccountWrap">
+          <label class="form-label">Apple Mail Account</label>
+          <select id="aiMailAccount" class="form-select">
+            <option value="">Default account</option>
+          </select>
+          <div class="form-text">
+            <a href="#" onclick="loadAiAccounts(); return false;">Refresh accounts</a>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Delay between emails (s)</label>
+          <input type="number" id="aiDelay" value="10" min="0" max="120" class="form-control">
+        </div>
+
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="aiCareers" checked>
+          <label class="form-check-label" for="aiCareers">Also send to <code>careers@domain</code></label>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="aiAttachResume" checked>
+          <label class="form-check-label" for="aiAttachResume">
+            Attach resume
+            {% if not resume_path %}<span class="text-danger ms-1">(not configured)</span>{% endif %}
+          </label>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="aiDryRun">
+          <label class="form-check-label" for="aiDryRun">Dry run (preview only)</label>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button class="btn btn-outline-primary" onclick="generateDrafts()">
+            <i class="bi bi-stars me-1"></i> Generate Previews
+          </button>
+          <button class="btn btn-primary d-none" id="aiSendAllBtn" onclick="sendAllDrafts()">
+            <i class="bi bi-send-fill me-1"></i> Send All Emails
+          </button>
+        </div>
+
+        <div id="aiGenProgress" class="mt-3 d-none">
+          <div class="d-flex align-items-center gap-2 text-muted small">
+            <span class="spinner-border spinner-border-sm"></span>
+            Generating emails with AI…
+          </div>
+        </div>
+        <div id="aiSendProgress" class="mt-3 d-none">
+          <div class="d-flex align-items-center gap-2 text-muted small">
+            <span class="spinner-border spinner-border-sm"></span>
+            Sending emails…
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-panel">
+      <div class="panel-header"><i class="bi bi-info-circle me-2"></i>How it works</div>
+      <div class="p-3 small text-muted">
+        <ol class="ps-3 mb-0">
+          <li class="mb-1">Paste email addresses (any format)</li>
+          <li class="mb-1">Tell the AI what to write</li>
+          <li class="mb-1">Review generated previews</li>
+          <li>Hit <strong>Send All</strong> — resume attached automatically</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: input + previews -->
+  <div class="col-lg-8">
+
+    <!-- Input area -->
+    <div class="card-panel mb-4">
+      <div class="panel-header"><i class="bi bi-envelope-at me-2"></i>Email Addresses</div>
+      <div class="p-3">
+        <textarea id="aiEmailList" class="form-control font-monospace"
+          rows="4" placeholder="Paste emails here, any format:
+john@acme.com, hr@startup.io
+careers@bigco.com
+founder@unicorn.ai"></textarea>
+        <div class="form-text mt-1" id="aiEmailCount"></div>
+      </div>
+    </div>
+
+    <div class="card-panel mb-4">
+      <div class="panel-header"><i class="bi bi-chat-text me-2"></i>Instructions for the AI</div>
+      <div class="p-3">
+        <textarea id="aiInstructions" class="form-control" rows="4"
+          placeholder="Tell the AI what to write, e.g.:
+'I'm a product manager with 3 years of SaaS experience. Write a warm cold email introducing me and asking for a quick chat about PM opportunities. Keep it concise and enthusiastic.'"></textarea>
+        <div class="form-text mt-1">
+          The AI will personalise each email for the company and attach your profile details automatically.
+          {% if llm_ready %}
+            <span class="badge bg-success ms-1"><i class="bi bi-cpu me-1"></i>LLM Ready</span>
+          {% else %}
+            <span class="badge bg-warning text-dark ms-1">No LLM — using template fallback</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview cards -->
+    <div id="aiPreviewArea"></div>
+
+    <!-- Send results -->
+    <div id="aiResults" class="d-none">
+      <div class="card-panel">
+        <div class="panel-header"><i class="bi bi-check2-all me-2"></i>Send Results</div>
+        <div class="p-3" id="aiResultsBody"></div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /row -->
+</div><!-- /aiPane -->
+
+</div><!-- /tab-content -->
+
+<!-- ── New Run Modal ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="newRunModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-play-circle me-2"></i>Create Automation Run</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Run Name</label>
+          <input type="text" id="runName" class="form-control"
+                 placeholder="e.g. Apple Mail — Morning batch">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Sender</label>
+          <select id="runSender" class="form-select" onchange="toggleRunAccount()">
+            <option value="apple_mail">Apple Mail</option>
+            <option value="smtp">Gmail / SMTP</option>
+            <option value="outlook">Outlook / Graph</option>
+          </select>
+        </div>
+        <div class="mb-3 d-none" id="runAccountWrap">
+          <label class="form-label">Apple Mail Account</label>
+          <select id="runAccount" class="form-select">
+            <option value="">Default account</option>
+          </select>
+          <a href="#" class="form-text" onclick="loadRunAccounts(); return false;">Refresh accounts</a>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Delay between emails (seconds)</label>
+          <input type="number" id="runDelay" value="10" min="0" max="300" class="form-control">
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="runCareers" checked>
+          <label class="form-check-label" for="runCareers">Also send to <code>careers@domain</code></label>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="runDryRun">
+          <label class="form-check-label" for="runDryRun">Dry run (no emails sent)</label>
+        </div>
+        <div class="alert alert-info small mb-0 mt-3">
+          <i class="bi bi-shield-check me-1"></i>
+          <strong>Duplicate protection:</strong> If you start two runs simultaneously (e.g. Apple Mail + Gmail),
+          each application is claimed atomically — the second run automatically skips any already-claimed startup
+          and picks the next available one. No email will be sent twice.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" onclick="createAndStartRun()">
+          <i class="bi bi-play-fill me-1"></i> Create & Start
+        </button>
+        <button type="button" class="btn btn-outline-primary" onclick="createRunOnly()">
+          Create (don't start yet)
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- Hidden form submitted programmatically -->
+<!-- Hidden form for quick-send tab -->
 <form id="bulkForm" method="post" action="{{ url_for('campaign') }}" class="d-none">
   <input type="hidden" name="action" id="formAction" value="send">
   <input type="hidden" name="sleep_seconds" id="formSleep" value="10">
@@ -157,47 +485,47 @@
 
 {% endblock %}
 
+
 {% block scripts %}
 <script>
+/* ── globals ────────────────────────────────────────────────────────────── */
+let _drafts      = [];
+let _pollTimer   = null;
+const runModal   = new bootstrap.Modal(document.getElementById('newRunModal'));
+
+/* ── Quick Send tab ─────────────────────────────────────────────────────── */
 function getCheckedIds() {
   return [...document.querySelectorAll('.app-check:checked')].map(c => c.value);
 }
-
 function selectAll(v) {
   document.querySelectorAll('.app-check').forEach(c => c.checked = v);
-  document.getElementById('masterCheck').checked = v;
+  const mc = document.getElementById('masterCheck');
+  if (mc) mc.checked = v;
 }
-
 function sendSelected() {
   const ids = getCheckedIds();
   if (!ids.length) { alert('Select at least one application.'); return; }
   if (!confirm(`Send ${ids.length} email(s) via Apple Mail?`)) return;
-
-  document.getElementById('formAction').value = 'send';
-  document.getElementById('formSleep').value  = document.getElementById('sleepSeconds').value;
-  document.getElementById('formDryRun').value = document.getElementById('dryRun').checked ? '1' : '0';
-  document.getElementById('formCareers').value = document.getElementById('sendCareers').checked ? '1' : '0';
-
-  const container = document.getElementById('formIds');
-  container.innerHTML = '';
+  document.getElementById('formAction').value   = 'send';
+  document.getElementById('formSleep').value    = document.getElementById('sleepSeconds').value;
+  document.getElementById('formDryRun').value   = document.getElementById('dryRun').checked ? '1' : '0';
+  document.getElementById('formCareers').value  = document.getElementById('sendCareers').checked ? '1' : '0';
+  const c = document.getElementById('formIds');
+  c.innerHTML = '';
   ids.forEach(id => {
     const inp = document.createElement('input');
     inp.type = 'hidden'; inp.name = 'app_ids'; inp.value = id;
-    container.appendChild(inp);
+    c.appendChild(inp);
   });
-
   document.getElementById('sendProgress').classList.remove('d-none');
   document.getElementById('bulkForm').submit();
 }
-
 function previewSelected() {
   const ids = getCheckedIds();
-  if (!ids.length) { alert('Select an application to preview.'); return; }
-
+  if (!ids.length) { alert('Select an application first.'); return; }
   const fd = new FormData();
   fd.append('action', 'preview');
   fd.append('app_id', ids[0]);
-
   fetch('{{ url_for("campaign") }}', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(d => {
@@ -209,5 +537,336 @@ function previewSelected() {
     })
     .catch(e => alert('Preview failed: ' + e));
 }
+
+/* ── Automation Runs tab ────────────────────────────────────────────────── */
+function openNewRunModal() {
+  document.getElementById('runName').value = '';
+  document.getElementById('runDelay').value = '10';
+  document.getElementById('runCareers').checked = true;
+  document.getElementById('runDryRun').checked = false;
+  document.getElementById('runSender').value = 'apple_mail';
+  toggleRunAccount();
+  runModal.show();
+}
+
+function toggleRunAccount() {
+  const mode = document.getElementById('runSender').value;
+  const wrap = document.getElementById('runAccountWrap');
+  if (mode === 'apple_mail') {
+    wrap.classList.remove('d-none');
+    loadRunAccounts();
+  } else {
+    wrap.classList.add('d-none');
+  }
+}
+
+function loadRunAccounts() {
+  fetch('/api/apple-mail-accounts')
+    .then(r => r.json())
+    .then(list => {
+      const sel = document.getElementById('runAccount');
+      sel.innerHTML = '<option value="">Default account</option>';
+      list.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.email;
+        opt.textContent = a.label;
+        sel.appendChild(opt);
+      });
+    })
+    .catch(() => {});
+}
+
+function _collectRunData() {
+  return {
+    name:               document.getElementById('runName').value.trim(),
+    sender_mode:        document.getElementById('runSender').value,
+    apple_mail_account: document.getElementById('runAccount')?.value || '',
+    sleep_seconds:      parseInt(document.getElementById('runDelay').value) || 10,
+    send_to_careers:    document.getElementById('runCareers').checked,
+    dry_run:            document.getElementById('runDryRun').checked,
+  };
+}
+
+function createAndStartRun() {
+  runModal.hide();
+  fetch('/api/campaign/runs/create', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(_collectRunData()),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { alert(d.error); return; }
+      return fetch(`/api/campaign/runs/${d.id}/start`, { method: 'POST' });
+    })
+    .then(() => { refreshRuns(); startPoll(); })
+    .catch(e => alert('Error: ' + e));
+}
+
+function createRunOnly() {
+  runModal.hide();
+  fetch('/api/campaign/runs/create', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(_collectRunData()),
+  })
+    .then(() => refreshRuns())
+    .catch(e => alert('Error: ' + e));
+}
+
+function startRun(id) {
+  fetch(`/api/campaign/runs/${id}/start`, { method: 'POST' })
+    .then(() => { refreshRuns(); startPoll(); })
+    .catch(e => alert('Error: ' + e));
+}
+
+function stopRun(id) {
+  fetch(`/api/campaign/runs/${id}/stop`, { method: 'POST' })
+    .then(() => refreshRuns())
+    .catch(e => alert('Error: ' + e));
+}
+
+function deleteRun(id) {
+  if (!confirm('Delete this run?')) return;
+  fetch(`/api/campaign/runs/${id}/delete`, { method: 'POST' })
+    .then(() => refreshRuns())
+    .catch(e => alert('Error: ' + e));
+}
+
+function refreshRuns() {
+  fetch('/api/campaign/runs')
+    .then(r => r.json())
+    .then(runs => {
+      renderRunList(runs);
+      updateStats();
+      // Keep polling while any run is active
+      const anyActive = runs.some(r => r.is_active);
+      if (!anyActive && _pollTimer) {
+        clearInterval(_pollTimer);
+        _pollTimer = null;
+      }
+    })
+    .catch(() => {});
+}
+
+function renderRunList(runs) {
+  const el = document.getElementById('runList');
+  if (!runs.length) {
+    el.innerHTML = `<div class="card-panel p-4 text-center text-muted" id="noRunsMsg">
+      No runs yet. Click <strong>New Run</strong> to create one.<br>
+      <small>You can run Apple Mail and Gmail simultaneously — they coordinate automatically to avoid duplicates.</small>
+    </div>`;
+    return;
+  }
+  el.innerHTML = runs.map(r => `
+    <div class="card-panel mb-2" id="run-card-${r.id}">
+      <div class="p-3 d-flex align-items-center gap-3 flex-wrap">
+        <div class="flex-grow-1">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <strong>${r.name}</strong>
+            <span class="badge run-status-${r.status}">${r.status}</span>
+            <span class="badge bg-secondary">${r.sender_mode}</span>
+            ${r.dry_run ? '<span class="badge bg-warning text-dark">dry run</span>' : ''}
+          </div>
+          <div class="small text-muted d-flex gap-3 flex-wrap">
+            <span><i class="bi bi-check-circle text-success me-1"></i>Sent: <strong>${r.sent}</strong></span>
+            <span><i class="bi bi-x-circle text-danger me-1"></i>Failed: <strong>${r.failed}</strong></span>
+            <span><i class="bi bi-skip-forward text-muted me-1"></i>Skipped: <strong>${r.skipped}</strong></span>
+            ${r.apple_mail_account ? `<span class="font-monospace">${r.apple_mail_account}</span>` : ''}
+          </div>
+          ${r.errors && r.errors !== '[]' ? `<div class="small text-danger mt-1">${JSON.parse(r.errors).slice(0,2).join(' | ')}</div>` : ''}
+        </div>
+        <div class="d-flex gap-2">
+          ${r.is_active
+            ? `<button class="btn btn-xs btn-danger" onclick="stopRun(${r.id})"><i class="bi bi-stop-fill me-1"></i>Stop</button>`
+            : `<button class="btn btn-xs btn-success" onclick="startRun(${r.id})"><i class="bi bi-play-fill me-1"></i>Start</button>`
+          }
+          <button class="btn btn-xs btn-outline-danger" onclick="deleteRun(${r.id})"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function updateStats() {
+  fetch('/api/stats')
+    .then(r => r.json())
+    .then(s => {
+      if (document.getElementById('statPending'))
+        document.getElementById('statPending').textContent = s.pending ?? '–';
+    })
+    .catch(() => {});
+}
+
+function startPoll() {
+  if (_pollTimer) return;
+  _pollTimer = setInterval(refreshRuns, 3000);
+}
+
+/* ── AI Composer tab ────────────────────────────────────────────────────── */
+function toggleAiAccount() {
+  const mode = document.getElementById('aiSenderMode').value;
+  const wrap = document.getElementById('aiAccountWrap');
+  if (mode === 'apple_mail') {
+    wrap.classList.remove('d-none');
+    loadAiAccounts();
+  } else {
+    wrap.classList.add('d-none');
+  }
+}
+
+function loadAiAccounts() {
+  fetch('/api/apple-mail-accounts')
+    .then(r => r.json())
+    .then(list => {
+      const sel = document.getElementById('aiMailAccount');
+      sel.innerHTML = '<option value="">Default account</option>';
+      list.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.email;
+        opt.textContent = a.label;
+        sel.appendChild(opt);
+      });
+    })
+    .catch(() => {});
+}
+
+// Live count of pasted emails
+document.getElementById('aiEmailList').addEventListener('input', function() {
+  const matches = this.value.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || [];
+  const unique  = [...new Set(matches.map(e => e.toLowerCase()))];
+  document.getElementById('aiEmailCount').textContent =
+    unique.length ? `${unique.length} email address${unique.length > 1 ? 'es' : ''} detected` : '';
+});
+
+function generateDrafts() {
+  const emails = document.getElementById('aiEmailList').value.trim();
+  const instr  = document.getElementById('aiInstructions').value.trim();
+  if (!emails) { alert('Paste some email addresses first.'); return; }
+
+  document.getElementById('aiGenProgress').classList.remove('d-none');
+  document.getElementById('aiSendAllBtn').classList.add('d-none');
+  document.getElementById('aiPreviewArea').innerHTML = '';
+  document.getElementById('aiResults').classList.add('d-none');
+
+  fetch('/api/campaign/ai-draft', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ emails, instructions: instr }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('aiGenProgress').classList.add('d-none');
+      if (d.error) { alert(d.error); return; }
+      _drafts = d.drafts;
+      renderDraftPreviews(_drafts);
+      document.getElementById('aiSendAllBtn').classList.remove('d-none');
+    })
+    .catch(e => {
+      document.getElementById('aiGenProgress').classList.add('d-none');
+      alert('Generation failed: ' + e);
+    });
+}
+
+function renderDraftPreviews(drafts) {
+  const area = document.getElementById('aiPreviewArea');
+  if (!drafts.length) { area.innerHTML = '<p class="text-muted">No drafts generated.</p>'; return; }
+  area.innerHTML = drafts.map((d, i) => `
+    <div class="card-panel mb-3">
+      <div class="panel-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-envelope me-2"></i>${d.email} — <em>${d.company}</em></span>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="draftCheck${i}" checked>
+          <label class="form-check-label small" for="draftCheck${i}">Include</label>
+        </div>
+      </div>
+      <div class="p-3">
+        <div class="mb-2">
+          <label class="form-label small fw-semibold text-muted">SUBJECT</label>
+          <input type="text" class="form-control form-control-sm font-monospace"
+                 id="draftSubject${i}" value="${escHtml(d.subject)}">
+        </div>
+        <div>
+          <label class="form-label small fw-semibold text-muted">BODY</label>
+          <textarea class="form-control small" id="draftBody${i}" rows="7">${escHtml(d.body)}</textarea>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function sendAllDrafts() {
+  const selected = _drafts
+    .map((d, i) => {
+      if (!document.getElementById(`draftCheck${i}`)?.checked) return null;
+      return {
+        email:   d.email,
+        company: d.company,
+        subject: document.getElementById(`draftSubject${i}`).value,
+        body:    document.getElementById(`draftBody${i}`).value,
+      };
+    })
+    .filter(Boolean);
+
+  if (!selected.length) { alert('No drafts selected.'); return; }
+  if (!confirm(`Send ${selected.length} email(s)?`)) return;
+
+  document.getElementById('aiSendProgress').classList.remove('d-none');
+  document.getElementById('aiSendAllBtn').disabled = true;
+
+  fetch('/api/campaign/ai-send', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      drafts:              selected,
+      sender_mode:         document.getElementById('aiSenderMode').value,
+      apple_mail_account:  document.getElementById('aiMailAccount')?.value || '',
+      send_to_careers:     document.getElementById('aiCareers').checked,
+      attach_resume:       document.getElementById('aiAttachResume').checked,
+      dry_run:             document.getElementById('aiDryRun').checked,
+    }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('aiSendProgress').classList.add('d-none');
+      document.getElementById('aiSendAllBtn').disabled = false;
+      renderSendResults(d);
+    })
+    .catch(e => {
+      document.getElementById('aiSendProgress').classList.add('d-none');
+      document.getElementById('aiSendAllBtn').disabled = false;
+      alert('Send failed: ' + e);
+    });
+}
+
+function renderSendResults(data) {
+  const box = document.getElementById('aiResults');
+  box.classList.remove('d-none');
+  const body = document.getElementById('aiResultsBody');
+  const rows = (data.results || []).map(r =>
+    `<div class="d-flex gap-2 align-items-center mb-1 small">
+       <span class="badge ${r.status === 'sent' ? 'bg-success' : r.status === 'failed' ? 'bg-danger' : 'bg-secondary'}">${r.status}</span>
+       <span class="font-monospace">${r.email}</span>
+       ${r.reason ? `<span class="text-danger">${r.reason}</span>` : ''}
+     </div>`
+  ).join('');
+  body.innerHTML = `
+    <div class="d-flex gap-3 mb-3">
+      <span class="text-success fw-semibold"><i class="bi bi-check-circle me-1"></i>Sent: ${data.sent}</span>
+      <span class="text-danger fw-semibold"><i class="bi bi-x-circle me-1"></i>Failed: ${data.failed}</span>
+    </div>
+    ${rows}`;
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ── On page load ────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+  // Start polling if any run is currently active
+  {% for run in runs %}{% if run.is_active %}startPoll();{% endif %}{% endfor %}
+  // Load Apple Mail accounts for AI composer
+  loadAiAccounts();
+});
 </script>
 {% endblock %}

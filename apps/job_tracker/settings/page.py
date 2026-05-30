@@ -179,8 +179,8 @@ class SettingsPage(QWidget):
         lay.setContentsMargins(24, 20, 24, 20)
         lay.setSpacing(20)
 
-        # ── Google / Gmail ────────────────────────────────────────────────────
-        g_box = QGroupBox("Google / Gmail")
+        # ── Google / Gmail (multiple accounts) ───────────────────────────────
+        g_box = QGroupBox("Google / Gmail  ·  Multiple Accounts")
         g_box.setStyleSheet(
             "QGroupBox { border: 2px solid rgba(234,67,53,0.8); border-radius: 10px; "
             "margin-top: 12px; color: #EA4335; font-weight: 700; font-size: 13px; } "
@@ -188,44 +188,36 @@ class SettingsPage(QWidget):
         )
         gf = QVBoxLayout(g_box)
         gf.setContentsMargins(18, 18, 18, 18)
-        gf.setSpacing(14)
+        gf.setSpacing(12)
 
         g_note = QLabel(
-            "Click the button below — your browser opens Google's sign-in page, "
-            "exactly like Apple Mail does. Sign in, allow all permissions, done.\n\n"
-            "Grants full Gmail access: inbox, sent, drafts, all folders, send on your behalf."
+            "Connect any number of Gmail accounts. Each can send emails independently — "
+            "great for running simultaneous campaigns from different addresses.\n"
+            "Sign in once; tokens are refreshed automatically."
         )
         g_note.setWordWrap(True)
         g_note.setStyleSheet("color: rgba(255,255,255,0.6); font-size: 12px; background: transparent;")
         gf.addWidget(g_note)
 
-        self.googleStatusLbl = QLabel("○  Not connected")
-        self.googleStatusLbl.setStyleSheet(
-            "color: rgba(255,255,255,0.4); font-size: 13px; background: transparent;"
-        )
-        gf.addWidget(self.googleStatusLbl)
+        # Dynamic account list
+        self._google_accounts_frame = QFrame()
+        self._google_accounts_frame.setStyleSheet("background: transparent;")
+        self._google_accounts_lay = QVBoxLayout(self._google_accounts_frame)
+        self._google_accounts_lay.setContentsMargins(0, 0, 0, 0)
+        self._google_accounts_lay.setSpacing(6)
+        gf.addWidget(self._google_accounts_frame)
 
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(10)
-
-        self.googleConnectBtn = QPushButton("  Sign in with Google  →")
-        self.googleConnectBtn.setFixedHeight(42)
-        self.googleConnectBtn.setStyleSheet(
+        add_btn = QPushButton("  + Add Google Account  →")
+        add_btn.setFixedHeight(42)
+        add_btn.setStyleSheet(
             "QPushButton { background: #EA4335; color: #fff; border-radius: 8px; "
             "font-size: 14px; font-weight: 600; border: none; }"
             "QPushButton:hover { background: #c5392d; }"
             "QPushButton:disabled { background: rgba(234,67,53,0.4); }"
         )
-        self.googleConnectBtn.clicked.connect(self._google_connect)
-        btn_row.addWidget(self.googleConnectBtn)
-
-        self.googleDisconnectBtn = QPushButton("Disconnect")
-        self.googleDisconnectBtn.setObjectName("subtleBtn")
-        self.googleDisconnectBtn.setFixedHeight(42)
-        self.googleDisconnectBtn.clicked.connect(self._google_disconnect)
-        btn_row.addWidget(self.googleDisconnectBtn)
-        btn_row.addStretch()
-        gf.addLayout(btn_row)
+        add_btn.clicked.connect(self._google_add_account)
+        self._google_add_btn = add_btn
+        gf.addWidget(add_btn)
         lay.addWidget(g_box)
 
         # ── Outlook via Apple Mail ────────────────────────────────────────────
@@ -292,16 +284,86 @@ class SettingsPage(QWidget):
         outer_lay.addWidget(scroll)
         return outer
 
-    # ── Google OAuth helpers ──────────────────────────────────────────────────
+    # ── Google multi-account helpers ──────────────────────────────────────────
 
-    def _google_connect(self):
-        self.googleConnectBtn.setEnabled(False)
-        self.googleConnectBtn.setText("Opening browser…")
-        self.googleStatusLbl.setText("○  Waiting for you to sign in…")
-        self.googleStatusLbl.setStyleSheet(
-            "color: #FCE100; font-size: 13px; background: transparent;"
-        )
+    def _rebuild_google_accounts_list(self):
+        """Repopulate the connected-accounts widget from disk."""
+        import time as _time
+        lay = self._google_accounts_lay
+        while lay.count():
+            item = lay.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
+        try:
+            from modules.oauth_manager import list_google_accounts
+            accounts = list_google_accounts()
+        except Exception:
+            accounts = []
+
+        if not accounts:
+            lbl = QLabel("  No Google accounts connected yet.")
+            lbl.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px; background: transparent;")
+            lay.addWidget(lbl)
+            return
+
+        for acct in accounts:
+            email      = acct.get("email", "?")
+            still_ok   = _time.time() < acct.get("expires_at", 0) - 60
+            status_ico = "●" if still_ok else "○"
+            status_col = "#6CCB5F" if still_ok else "#FCE100"
+
+            row_w = QWidget()
+            row_w.setStyleSheet(
+                "background: rgba(255,255,255,0.05); border-radius: 8px;"
+            )
+            rl = QHBoxLayout(row_w)
+            rl.setContentsMargins(12, 8, 12, 8)
+            rl.setSpacing(10)
+
+            dot = QLabel(status_ico)
+            dot.setStyleSheet(
+                f"color: {status_col}; font-size: 13px; background: transparent;"
+            )
+            rl.addWidget(dot)
+
+            email_lbl = QLabel(email)
+            email_lbl.setStyleSheet(
+                "color: #EFEFEF; font-size: 13px; background: transparent;"
+            )
+            rl.addWidget(email_lbl, 1)
+
+            reconnect_btn = QPushButton("↺  Reconnect")
+            reconnect_btn.setObjectName("subtleBtn")
+            reconnect_btn.setFixedHeight(28)
+            reconnect_btn.clicked.connect(lambda _, e=email: self._google_reconnect(e))
+            rl.addWidget(reconnect_btn)
+
+            delete_btn = QPushButton("Delete")
+            delete_btn.setObjectName("subtleBtn")
+            delete_btn.setFixedHeight(28)
+            delete_btn.setStyleSheet(
+                "QPushButton { color: #FF99A4; } QPushButton:hover { background: rgba(255,80,80,0.15); }"
+            )
+            delete_btn.clicked.connect(lambda _, e=email: self._google_delete_account(e))
+            rl.addWidget(delete_btn)
+
+            lay.addWidget(row_w)
+
+    def _google_add_account(self):
+        self._google_add_btn.setEnabled(False)
+        self._google_add_btn.setText("Opening browser…")
+        self._oauth_dlg = _OAuthWaitDialog(self)
+        self._oauth_worker = OAuthWorker("google")
+        self._oauth_worker.done.connect(self._google_auth_done)
+        self._oauth_worker.error.connect(self._google_auth_error)
+        self._oauth_worker.finished.connect(lambda: setattr(self, "_oauth_worker", None))
+        self._oauth_worker.start()
+        self._oauth_dlg.exec()
+
+    def _google_reconnect(self, email: str):
+        self._google_add_btn.setEnabled(False)
+        self._google_add_btn.setText("Opening browser…")
         self._oauth_dlg = _OAuthWaitDialog(self)
         self._oauth_worker = OAuthWorker("google")
         self._oauth_worker.done.connect(self._google_auth_done)
@@ -314,48 +376,37 @@ class SettingsPage(QWidget):
         if self._oauth_dlg:
             self._oauth_dlg.accept()
             self._oauth_dlg = None
-        self.googleConnectBtn.setEnabled(True)
-        self.googleConnectBtn.setText("  Sign in with Google  →")
-        self.googleStatusLbl.setText(f"✓  Connected — {email}")
-        self.googleStatusLbl.setStyleSheet(
-            "color: #6CCB5F; font-size: 13px; background: transparent;"
-        )
+        self._google_add_btn.setEnabled(True)
+        self._google_add_btn.setText("  + Add Google Account  →")
+        self._rebuild_google_accounts_list()
         QMessageBox.information(
             self, "Gmail Connected",
             f"Connected as  {email}\n\n"
-            "Campaign emails, reply tracking, and the Mail tab\n"
-            "all use your Gmail account now.\n\n"
-            "Full access granted: inbox, sent, drafts, all folders.",
+            "You can now send emails, track replies, and use the Mail tab "
+            "from this account.\n\nAdd more accounts to send from multiple Gmail addresses.",
         )
 
     def _google_auth_error(self, err: str):
         if self._oauth_dlg:
             self._oauth_dlg.reject()
             self._oauth_dlg = None
-        self.googleConnectBtn.setEnabled(True)
-        self.googleConnectBtn.setText("  Sign in with Google  →")
-        self.googleStatusLbl.setText("✕  Authentication failed")
-        self.googleStatusLbl.setStyleSheet(
-            "color: #FF99A4; font-size: 13px; background: transparent;"
-        )
+        self._google_add_btn.setEnabled(True)
+        self._google_add_btn.setText("  + Add Google Account  →")
         QMessageBox.critical(self, "Google Sign-in Failed", err)
 
-    def _google_disconnect(self):
+    def _google_delete_account(self, email: str):
         if QMessageBox.question(
-            self, "Disconnect Gmail",
-            "Disconnect your Gmail account?\nCampaign emails will stop working until you reconnect.",
+            self, "Remove Account",
+            f"Remove  {email}?\nYou can always reconnect it later.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:
             return
         try:
-            from modules.oauth_manager import google_disconnect
-            google_disconnect()
+            from modules.oauth_manager import google_disconnect_account
+            google_disconnect_account(email)
         except Exception:
             pass
-        self.googleStatusLbl.setText("○  Not connected")
-        self.googleStatusLbl.setStyleSheet(
-            "color: rgba(255,255,255,0.4); font-size: 13px; background: transparent;"
-        )
+        self._rebuild_google_accounts_list()
 
     # ── Apple Mail SSO helpers ────────────────────────────────────────────────
 
@@ -464,11 +515,54 @@ class SettingsPage(QWidget):
         load.setObjectName("accentBtn")
         load.clicked.connect(self._load_model)
 
+        # ── Groq cloud AI ─────────────────────────────────────────────────────
+        groq_sep = QLabel("─" * 40)
+        groq_sep.setStyleSheet("color: rgba(255,255,255,0.12); background: transparent;")
+
+        groq_hdr = QLabel("✦  Groq Cloud AI  (recommended — fast, free tier)")
+        groq_hdr.setStyleSheet(
+            "color: #A78BFA; font-size: 13px; font-weight: 700; background: transparent; padding: 4px 0;"
+        )
+
+        self.groqKey = QLineEdit()
+        self.groqKey.setPlaceholderText("gsk_…  (get yours free at console.groq.com)")
+        self.groqKey.setEchoMode(QLineEdit.EchoMode.Password)
+
+        show_key = QPushButton("Show")
+        show_key.setObjectName("subtleBtn")
+        show_key.setFixedWidth(56)
+        show_key.setCheckable(True)
+        show_key.toggled.connect(
+            lambda v: self.groqKey.setEchoMode(
+                QLineEdit.EchoMode.Normal if v else QLineEdit.EchoMode.Password
+            )
+        )
+        groq_row = QHBoxLayout()
+        groq_row.addWidget(self.groqKey)
+        groq_row.addWidget(show_key)
+
+        self.groqStatusLbl = QLabel("")
+        self.groqStatusLbl.setStyleSheet("font-size: 12px; background: transparent;")
+
+        groq_note = QLabel(
+            "When set: AI reply drafts and AI Composer use Groq (llama3-8b-8192) — "
+            "no local GPU needed. Falls back to local Mistral 7B if Groq is unavailable."
+        )
+        groq_note.setWordWrap(True)
+        groq_note.setStyleSheet(
+            "color: rgba(255,255,255,0.45); font-size: 12px; background: transparent;"
+        )
+
         lay.addRow("Model (.gguf):", mrow)
         lay.addRow("Context length:", self.llmCtx)
         lay.addRow("GPU Layers:", self.llmGpu)
         lay.addRow("Status:", self.modelStatusLbl)
         lay.addRow("", load)
+        lay.addRow("", groq_sep)
+        lay.addRow("", groq_hdr)
+        lay.addRow("Groq API Key:", groq_row)
+        lay.addRow("", self.groqStatusLbl)
+        lay.addRow("", groq_note)
 
         note = QLabel(
             "<b>GPU Layers = 35</b> → Apple Metal (fast, M1/M2/M3/M4)<br>"
@@ -584,14 +678,19 @@ links the reply to the right application, and Mistral 7B drafts a response for y
         self.sResume.setText(resume)
         self._update_resume_status(resume)
 
-        # Google OAuth status
+        # Google multi-account list
+        self._rebuild_google_accounts_list()
+
+        # Groq
+        self.groqKey.setText(g("groq_api_key"))
         try:
-            from modules.oauth_manager import is_google_connected, google_email
-            if is_google_connected():
-                self.googleStatusLbl.setText(f"✓  Connected — {google_email()}")
-                self.googleStatusLbl.setStyleSheet(
-                    "color: #6CCB5F; font-size: 13px; background: transparent;"
-                )
+            from modules.groq_client import is_configured
+            if is_configured():
+                self.groqStatusLbl.setText("✓  Groq configured — AI drafts use cloud AI")
+                self.groqStatusLbl.setStyleSheet("color: #6CCB5F; font-size: 12px; background: transparent;")
+            else:
+                self.groqStatusLbl.setText("○  Not configured — AI drafts use local model only")
+                self.groqStatusLbl.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px; background: transparent;")
         except Exception:
             pass
 
@@ -626,9 +725,20 @@ links the reply to the right application, and Mistral 7B drafts a response for y
             "llm_model_path":  self.llmPath.text().strip(),
             "llm_context":     self.llmCtx.text().strip(),
             "llm_gpu_layers":  self.llmGpu.text().strip(),
+            "groq_api_key":    self.groqKey.text().strip(),
         }
         for k, v in pairs.items():
             if v:
                 set_setting(k, v)
         self._update_resume_status(pairs.get("resume_path", ""))
+
+        # Update Groq status indicator
+        from modules.groq_client import is_configured
+        if is_configured():
+            self.groqStatusLbl.setText("✓  Groq configured — AI drafts use cloud AI")
+            self.groqStatusLbl.setStyleSheet("color: #6CCB5F; font-size: 12px; background: transparent;")
+        else:
+            self.groqStatusLbl.setText("○  Not configured — AI drafts use local model only")
+            self.groqStatusLbl.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px; background: transparent;")
+
         QMessageBox.information(self, "Saved", "Settings saved.")

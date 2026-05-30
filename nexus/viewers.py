@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QTextEdit, QScrollArea,
     QLineEdit, QFrame, QSizePolicy, QHeaderView, QMessageBox,
-    QStackedWidget,
+    QStackedWidget, QAbstractScrollArea,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap
@@ -103,7 +103,27 @@ class AppViewer(QWidget):
                 # Embed as a widget (removes the OS window frame)
                 w.setWindowFlag(Qt.WindowType.Widget, True)
                 w.statusBar().hide()   # NexusOS has its own status bar
-                return w
+
+                # When embedded the panel may be narrower than the app's natural
+                # width (1140 px).  Override the minimum so Qt does not try to
+                # enforce it, then wrap in a scroll area so content is never
+                # clipped or overlapped — scrollbars appear instead.
+                w.setMinimumSize(860, 580)
+
+                scroll = QScrollArea()
+                scroll.setWidget(w)
+                # widgetResizable=True: widget expands to fill available space;
+                # if the panel is wider than 860 px the app fills it naturally.
+                # If the panel is narrower, Qt respects the 860 px minimum and
+                # shows a scrollbar rather than squashing content.
+                scroll.setWidgetResizable(True)
+                scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+                scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+                scroll.setFrameShape(QFrame.Shape.NoFrame)
+                scroll.setSizeAdjustPolicy(
+                    QAbstractScrollArea.SizeAdjustPolicy.AdjustIgnored
+                )
+                return scroll
             except Exception as e:
                 return self._placeholder(f"Could not load JobTracker:\n{e}")
 

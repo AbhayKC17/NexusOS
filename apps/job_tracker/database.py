@@ -84,6 +84,24 @@ def init_db():
             key   TEXT PRIMARY KEY,
             value TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS campaign_runs (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            name                TEXT,
+            sender_mode         TEXT    DEFAULT 'apple_mail',
+            apple_mail_account  TEXT    DEFAULT '',
+            sleep_seconds       INTEGER DEFAULT 10,
+            send_to_careers     INTEGER DEFAULT 1,
+            dry_run             INTEGER DEFAULT 0,
+            status              TEXT    DEFAULT 'pending',
+            sent                INTEGER DEFAULT 0,
+            failed              INTEGER DEFAULT 0,
+            skipped             INTEGER DEFAULT 0,
+            errors              TEXT    DEFAULT '[]',
+            created_at          TEXT    DEFAULT (datetime('now')),
+            started_at          TEXT,
+            completed_at        TEXT
+        );
     ''')
 
     # seed default templates
@@ -103,6 +121,7 @@ def init_db():
         "ALTER TABLE applications ADD COLUMN raw_data TEXT",
         "ALTER TABLE applications ADD COLUMN extra_columns TEXT",
         "ALTER TABLE applications ADD COLUMN tkey TEXT",
+        "ALTER TABLE applications ADD COLUMN campaign_run_id INTEGER",
         """CREATE TABLE IF NOT EXISTS inbox_index (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             message_uid     TEXT    UNIQUE,

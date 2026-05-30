@@ -287,7 +287,20 @@ QComboBox QAbstractItemView {{
     border-radius: 7px;
     color: {TEXT_PRIMARY};
     selection-background-color: rgba(99,102,241,0.22);
+    selection-color: #FFFFFF;
     outline: none;
+    padding: 4px;
+}}
+QComboBox QAbstractItemView::item {{
+    color: {TEXT_PRIMARY};
+    background: transparent;
+    padding: 6px 12px;
+    min-height: 30px;
+}}
+QComboBox QAbstractItemView::item:selected,
+QComboBox QAbstractItemView::item:hover {{
+    background: rgba(99,102,241,0.22);
+    color: #FFFFFF;
 }}
 
 QSpinBox {{
@@ -802,7 +815,20 @@ QComboBox QAbstractItemView {{
     border-radius: 7px;
     color: {TEXT_PRIMARY_L};
     selection-background-color: {ACCENT_SUBTLE_L};
+    selection-color: {ACCENT_L};
     outline: none;
+    padding: 4px;
+}}
+QComboBox QAbstractItemView::item {{
+    color: {TEXT_PRIMARY_L};
+    background: transparent;
+    padding: 6px 12px;
+    min-height: 30px;
+}}
+QComboBox QAbstractItemView::item:selected,
+QComboBox QAbstractItemView::item:hover {{
+    background: {ACCENT_SUBTLE_L};
+    color: {ACCENT_L};
 }}
 QSpinBox {{
     background: {SURFACE_L};

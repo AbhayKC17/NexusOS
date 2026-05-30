@@ -91,6 +91,7 @@ class _AppBrand(QWidget):
 
         sub = QLabel("AI Application Manager")
         sub.setObjectName("appSubtitle")
+        sub.setWordWrap(True)
         lay.addWidget(sub)
 
 
@@ -145,7 +146,7 @@ class Sidebar(QFrame):
     def __init__(self, nav_callback, parent=None):
         super().__init__(parent)
         self.setObjectName("sidebar")
-        self.setFixedWidth(220)
+        self.setFixedWidth(192)
 
         self._nav_callback = nav_callback
         self._buttons: list[_NavButton] = []
@@ -216,7 +217,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("JobTracker — AI Job Application Assistant")
-        self.setMinimumSize(1140, 760)
+        self.setMinimumSize(860, 580)
 
         self._loader      = None
         self._sync_worker = None

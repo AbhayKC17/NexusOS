@@ -12,13 +12,14 @@ Flow
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from nexus.graph_db import all_nodes, edges_for_node, get_node
-from nexus.registry import all_functions, call as reg_call
+from nexus.registry import all_functions, call as reg_call, get as reg_get
 
 
 # ── Node relevance scoring ────────────────────────────────────────────────────
@@ -105,6 +106,41 @@ def _call_llm(prompt: str) -> str:
     return "[LLM not loaded — start model in Settings]"
 
 
+# ── Parameterized call parser ─────────────────────────────────────────────────
+
+def _parse_fn_call(text: str) -> tuple[str, dict]:
+    """
+    Parse 'fn_name' or 'fn_name(key="val", key2=123)' into (name, kwargs).
+    Falls back gracefully to (name, {}) on any parse error.
+    """
+    text = text.strip().rstrip(".")
+    if "(" not in text:
+        return text.strip(), {}
+    try:
+        tree = ast.parse(text, mode="eval")
+        node = tree.body
+        if not isinstance(node, ast.Call):
+            return text.split("(")[0].strip(), {}
+        # Extract function name
+        if isinstance(node.func, ast.Name):
+            fn_name = node.func.id
+        elif isinstance(node.func, ast.Attribute):
+            fn_name = node.func.attr
+        else:
+            fn_name = text.split("(")[0].strip()
+        # Extract keyword arguments (safe — literal values only)
+        kwargs: dict = {}
+        for kw in node.keywords:
+            if kw.arg:
+                try:
+                    kwargs[kw.arg] = ast.literal_eval(kw.value)
+                except Exception:
+                    pass
+        return fn_name, kwargs
+    except Exception:
+        return text.split("(")[0].strip(), {}
+
+
 # ── Background worker ─────────────────────────────────────────────────────────
 
 class AgentWorker(QThread):
@@ -128,29 +164,47 @@ class AgentWorker(QThread):
             node_ids = [n["id"] for n in nodes]
             context = _build_context(nodes)
 
+            fns = all_functions()
+            fn_guide = ""
+            if fns:
+                fn_guide = (
+                    "\n\nAVAILABLE FUNCTIONS (call these to act, not just describe):\n"
+                    + "\n".join(f"  • {f['name']}: {f['description']}" for f in fns)
+                    + "\n\nTo call a function write EXACTLY:\n"
+                    "  call: function_name(key=\"value\", key2=\"value2\")\n"
+                    "Always include all relevant arguments. "
+                    "For send_email: to_email is required; company and description improve personalisation.\n"
+                    "Example: call: send_email(to_email=\"hr@acme.com\", company=\"Acme\", "
+                    "description=\"Berlin fintech startup\")"
+                )
+
             prompt = (
                 "You are NexusOS, an AI-native operating system with access to a "
                 "knowledge graph of apps, files, and functions.\n\n"
-                f"{context}\n"
+                f"{context}"
+                f"{fn_guide}\n\n"
                 f"User request: {query}\n\n"
-                "Describe what you would do to fulfill this request using the available "
-                "knowledge graph nodes and functions. If you would call a registered "
-                "function, mention it with 'call: function_name'."
+                "Respond concisely. If the request requires sending an email or taking "
+                "an action, output the call: directive with full arguments so it executes "
+                "immediately — do not just describe the steps."
             )
 
             response = _call_llm(prompt)
 
-            # Parse + execute function calls (max 2 for safety)
-            fn_matches = re.findall(r"call:\s*(\w+)", response, re.IGNORECASE)
+            # Parse + execute parameterized function calls (max 2 for safety)
+            raw_calls = re.findall(r"call:\s*([^\n]+)", response, re.IGNORECASE)
             exec_results: list[str] = []
-            for fn_name in fn_matches[:2]:
-                try:
-                    out = reg_call(fn_name)
-                    exec_results.append(f"✓ {fn_name}() → {str(out)[:120]}")
-                except KeyError:
+            for raw in raw_calls[:2]:
+                fn_name, kwargs = _parse_fn_call(raw.strip())
+                if not reg_get(fn_name):
                     exec_results.append(f"⚠ {fn_name} is not registered")
+                    continue
+                try:
+                    out = reg_call(fn_name, **kwargs)
+                    out_str = json.dumps(out, default=str)[:200] if isinstance(out, dict) else str(out)[:120]
+                    exec_results.append(f"✓ {fn_name}({', '.join(f'{k}={repr(v)}' for k,v in kwargs.items())}) → {out_str}")
                 except Exception as e:
-                    exec_results.append(f"✕ {fn_name} error: {str(e)[:80]}")
+                    exec_results.append(f"✕ {fn_name} error: {str(e)[:120]}")
 
             # Format output (uses simple markers that _AIBar._on_result renders)
             parts = [f"**Query:** {query}", ""]

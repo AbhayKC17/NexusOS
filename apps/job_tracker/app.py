@@ -7,7 +7,7 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
-from database import init_db, get_db, get_setting, set_setting
+from database import init_db, get_db, get_setting, set_setting, subject_to_tracking_key
 from modules.excel_processor import process_excel
 from modules.email_sender import send_tracked_email
 from modules.email_monitor import sync_replies
@@ -16,7 +16,10 @@ from modules.scheduler import init_scheduler, schedule_one_off_email
 from modules.apple_mail_sender import (
     run_bulk_campaign, send_via_apple_mail,
     generate_personalized_intro, build_email_body, transform_to_careers,
+    get_apple_mail_accounts, _profile,
 )
+from modules import campaign_runner
+from modules.ai_composer import compose_batch
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -26,6 +29,7 @@ app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 ALLOWED_EXT = {'.xlsx', '.xls', '.csv'}
 
 init_db()
+campaign_runner.cleanup_stale_runs()
 scheduler = init_scheduler(app)
 
 
@@ -448,24 +452,46 @@ def campaign():
         conn.close()
         return redirect(url_for('campaign'))
 
-    # GET — list pending/unsent applications
+    # GET — list applications + runs
     apps = conn.execute('''
         SELECT id, company, position, contact_email, status, notes
         FROM applications
-        WHERE status IN ('pending', 'sent')
+        WHERE status IN ('pending', 'sent', 'in_progress')
         ORDER BY created_at DESC
     ''').fetchall()
+
+    runs_raw = conn.execute(
+        "SELECT * FROM campaign_runs ORDER BY created_at DESC"
+    ).fetchall()
+
+    pending_count = conn.execute(
+        "SELECT COUNT(*) FROM applications WHERE status='pending'"
+    ).fetchone()[0]
+
+    in_progress_count = conn.execute(
+        "SELECT COUNT(*) FROM applications WHERE status='in_progress'"
+    ).fetchone()[0]
+
     conn.close()
+
+    runs = []
+    for r in runs_raw:
+        d = dict(r)
+        d['is_active'] = campaign_runner.is_active(r['id'])
+        runs.append(d)
 
     resume_path = get_setting('resume_path', '')
     sender_name = get_setting('sender_name', '')
-    llm_ready = bool(get_setting('llm_model_path', ''))
+    llm_ready   = bool(get_setting('llm_model_path', ''))
 
     return render_template('campaign.html',
         apps=apps,
         resume_path=resume_path,
         sender_name=sender_name,
         llm_ready=llm_ready,
+        runs=runs,
+        pending_count=pending_count,
+        in_progress_count=in_progress_count,
     )
 
 
@@ -502,6 +528,182 @@ def save_profile():
             set_setting(key, val)
     flash('Sender profile saved', 'success')
     return redirect(url_for('settings'))
+
+
+# ─── Campaign Runs API ────────────────────────────────────────────────────────
+
+@app.route('/api/apple-mail-accounts')
+def api_apple_mail_accounts():
+    accounts = get_apple_mail_accounts()
+    return jsonify([{'label': lbl, 'email': em} for lbl, em in accounts])
+
+
+@app.route('/api/campaign/runs')
+def api_campaign_runs():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM campaign_runs ORDER BY created_at DESC").fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d['is_active'] = campaign_runner.is_active(r['id'])
+        result.append(d)
+    return jsonify(result)
+
+
+@app.route('/api/campaign/runs/create', methods=['POST'])
+def api_create_run():
+    data = request.json or {}
+    conn = get_db()
+    conn.execute('''
+        INSERT INTO campaign_runs
+            (name, sender_mode, apple_mail_account, sleep_seconds, send_to_careers, dry_run)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (
+        (data.get('name') or '').strip() or f"Run {datetime.utcnow().strftime('%H:%M')}",
+        data.get('sender_mode', 'apple_mail'),
+        data.get('apple_mail_account', ''),
+        int(data.get('sleep_seconds') or 10),
+        1 if data.get('send_to_careers', True) else 0,
+        1 if data.get('dry_run', False) else 0,
+    ))
+    conn.commit()
+    run_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.close()
+    return jsonify({'id': run_id, 'status': 'created'})
+
+
+@app.route('/api/campaign/runs/<int:run_id>/start', methods=['POST'])
+def api_start_run(run_id):
+    conn = get_db()
+    run = conn.execute("SELECT id FROM campaign_runs WHERE id=?", (run_id,)).fetchone()
+    conn.close()
+    if not run:
+        return jsonify({'error': 'Run not found'}), 404
+    started = campaign_runner.start_run(run_id)
+    return jsonify({'started': started})
+
+
+@app.route('/api/campaign/runs/<int:run_id>/stop', methods=['POST'])
+def api_stop_run(run_id):
+    stopped = campaign_runner.stop_run(run_id)
+    return jsonify({'stopped': stopped})
+
+
+@app.route('/api/campaign/runs/<int:run_id>/status')
+def api_run_status(run_id):
+    conn = get_db()
+    run = conn.execute("SELECT * FROM campaign_runs WHERE id=?", (run_id,)).fetchone()
+    conn.close()
+    if not run:
+        return jsonify({'error': 'Not found'}), 404
+    d = dict(run)
+    d['is_active'] = campaign_runner.is_active(run_id)
+    return jsonify(d)
+
+
+@app.route('/api/campaign/runs/<int:run_id>/delete', methods=['POST'])
+def api_delete_run(run_id):
+    campaign_runner.stop_run(run_id)
+    conn = get_db()
+    conn.execute("DELETE FROM campaign_runs WHERE id=?", (run_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'deleted': True})
+
+
+# ─── AI Composer API ──────────────────────────────────────────────────────────
+
+@app.route('/api/campaign/ai-draft', methods=['POST'])
+def api_ai_draft():
+    data = request.json or {}
+    email_raw    = data.get('emails', '').strip()
+    instructions = data.get('instructions', '').strip()
+    if not email_raw:
+        return jsonify({'error': 'No email addresses provided'}), 400
+    drafts = compose_batch(email_raw, instructions)
+    if not drafts:
+        return jsonify({'error': 'No valid email addresses found'}), 400
+    return jsonify({'drafts': drafts})
+
+
+@app.route('/api/campaign/ai-send', methods=['POST'])
+def api_ai_send():
+    data         = request.json or {}
+    drafts       = data.get('drafts', [])
+    sender_mode  = data.get('sender_mode', 'apple_mail')
+    account      = data.get('apple_mail_account', '')
+    send_careers = bool(data.get('send_to_careers', True))
+    attach_resume = bool(data.get('attach_resume', True))
+    dry_run      = bool(data.get('dry_run', False))
+
+    p = _profile()
+    resume = p['resume'] if attach_resume and p['resume'] and os.path.isfile(p['resume']) else None
+
+    results = []
+    conn = get_db()
+
+    for draft in drafts:
+        email   = (draft.get('email') or '').strip().lower()
+        company = draft.get('company', '')
+        subject = draft.get('subject', '')
+        body    = draft.get('body', '')
+
+        if not email or '@' not in email:
+            results.append({'email': email, 'status': 'skipped', 'reason': 'invalid email'})
+            continue
+
+        to_emails = [email]
+        if send_careers:
+            care = transform_to_careers(email)
+            if care != email:
+                to_emails.append(care)
+
+        try:
+            tkey = subject_to_tracking_key(subject)
+
+            if dry_run:
+                print(f"[AI DRY RUN] To: {to_emails} | {subject}")
+            elif sender_mode == 'outlook':
+                from modules.outlook_sender import send_via_outlook
+                send_via_outlook(to_emails, subject, body, resume, tkey)
+            elif sender_mode == 'smtp':
+                from modules.mail_client import send_email as _smtp
+                _smtp(to_emails, subject, body, attachment_path=resume, tracking_key=tkey)
+            else:
+                send_via_apple_mail(to_emails, subject, body, resume, tkey,
+                                    from_account=account)
+
+            now = datetime.utcnow().isoformat()
+            existing = conn.execute(
+                "SELECT id FROM applications WHERE contact_email=?", (email,)
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE applications SET status='sent', sent_at=?, "
+                    "email_subject=?, email_body=?, tkey=? WHERE id=?",
+                    (now, subject, body, tkey, existing['id']),
+                )
+            else:
+                new_uuid = str(uuid.uuid4())
+                conn.execute('''
+                    INSERT INTO applications
+                        (uuid, company, contact_email, status, sent_at,
+                         email_subject, email_body, tkey)
+                    VALUES (?, ?, ?, 'sent', ?, ?, ?, ?)
+                ''', (new_uuid, company, email, now, subject, body, tkey))
+            conn.commit()
+            results.append({'email': email, 'status': 'sent'})
+
+        except Exception as exc:
+            results.append({'email': email, 'status': 'failed', 'reason': str(exc)[:160]})
+
+    conn.close()
+    return jsonify({
+        'results': results,
+        'sent':   sum(1 for r in results if r['status'] == 'sent'),
+        'failed': sum(1 for r in results if r['status'] == 'failed'),
+    })
 
 
 if __name__ == '__main__':

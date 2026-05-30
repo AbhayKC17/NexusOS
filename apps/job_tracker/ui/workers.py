@@ -91,14 +91,15 @@ class BulkSendWorker(QThread):
 
     def __init__(self, app_ids, sleep_seconds=10, dry_run=False,
                  send_to_careers=True, sender_mode="apple_mail",
-                 apple_mail_account=""):
+                 apple_mail_account="", google_account_email=""):
         super().__init__()
-        self.app_ids            = app_ids
-        self.sleep_seconds      = sleep_seconds
-        self.dry_run            = dry_run
-        self.send_to_careers    = send_to_careers
-        self.sender_mode        = sender_mode
-        self.apple_mail_account = apple_mail_account
+        self.app_ids              = app_ids
+        self.sleep_seconds        = sleep_seconds
+        self.dry_run              = dry_run
+        self.send_to_careers      = send_to_careers
+        self.sender_mode          = sender_mode
+        self.apple_mail_account   = apple_mail_account
+        self.google_account_email = google_account_email
         _connect_cleanup(self)
 
     def run(self):
@@ -110,6 +111,7 @@ class BulkSendWorker(QThread):
             send_to_careers=self.send_to_careers,
             sender_mode=self.sender_mode,
             apple_mail_account=self.apple_mail_account,
+            google_account_email=self.google_account_email,
             progress_callback=lambda aid, co, st: self.progress.emit(aid, co, st),
         )
         self.done.emit(result)
@@ -215,8 +217,8 @@ class OAuthWorker(QThread):
     def run(self):
         try:
             if self.provider == "google":
-                from modules.oauth_manager import google_connect
-                email = google_connect()    # uses bundled credentials
+                from modules.oauth_manager import google_connect_new
+                email = google_connect_new()   # saves to multi-account store
             else:
                 from modules.oauth_manager import ms_connect
                 email = ms_connect(self.client_id)
@@ -272,6 +274,81 @@ class DraftRegenWorker(QThread):
             self.done.emit(self.row_id, draft)
         except Exception as e:
             self.error.emit(self.row_id, str(e))
+
+
+class SendAllDraftsWorker(QThread):
+    """
+    Sends all pending AI-drafted replies from inbox_index.
+    Supports Apple Mail and any connected Google account.
+    """
+    progress = pyqtSignal(int, str, bool)   # row_id, to_email, success
+    done     = pyqtSignal(int, int, list)   # sent_count, failed_count, errors
+
+    def __init__(self, sender_mode: str = "apple_mail", google_account_email: str = ""):
+        super().__init__()
+        self.sender_mode          = sender_mode
+        self.google_account_email = google_account_email
+        _connect_cleanup(self)
+
+    def run(self):
+        from database import get_db
+        conn = get_db()
+        rows = conn.execute("""
+            SELECT i.id, i.from_email, i.subject, i.ai_reply_draft,
+                   i.body, i.application_id,
+                   a.email_body AS orig_body, a.email_subject AS orig_subj,
+                   a.company, a.position
+            FROM inbox_index i
+            LEFT JOIN applications a ON i.application_id = a.id
+            WHERE i.tkey IS NOT NULL
+              AND i.reply_status NOT IN ('handled', 'sent')
+              AND i.ai_reply_draft IS NOT NULL
+              AND trim(i.ai_reply_draft) != ''
+            ORDER BY i.received_at DESC
+        """).fetchall()
+        conn.close()
+
+        sent = failed = 0
+        errors: list = []
+
+        for row in rows:
+            row_id   = row["id"]
+            raw_from = row["from_email"] or ""
+            to_email = (
+                raw_from.split("<")[1].rstrip(">").strip()
+                if "<" in raw_from and ">" in raw_from
+                else raw_from.strip()
+            )
+            subject = "Re: " + (row["subject"] or "")
+            draft   = row["ai_reply_draft"] or ""
+
+            if not to_email or "@" not in to_email:
+                continue
+
+            try:
+                if self.sender_mode == "smtp" and self.google_account_email:
+                    from modules.mail_client import send_email
+                    send_email([to_email], subject, draft,
+                               from_account_email=self.google_account_email)
+                else:
+                    from modules.apple_mail_sender import send_via_apple_mail
+                    send_via_apple_mail([to_email], subject, draft)
+
+                conn2 = get_db()
+                conn2.execute(
+                    "UPDATE inbox_index SET reply_status='sent' WHERE id=?", (row_id,)
+                )
+                conn2.commit()
+                conn2.close()
+                sent += 1
+                self.progress.emit(row_id, to_email, True)
+
+            except Exception as exc:
+                failed += 1
+                errors.append(f"{to_email}: {str(exc)[:100]}")
+                self.progress.emit(row_id, to_email, False)
+
+        self.done.emit(sent, failed, errors)
 
 
 # ResumeWorker and ResumeExportWorker moved to resume_builder/workers.py

@@ -209,36 +209,22 @@ def google_refresh(client_id: str, client_secret: str, refresh_token: str) -> st
 
 
 def get_google_token() -> str:
-    """Return a valid Google access token, refreshing if expired."""
-    t = _load_tokens("google")
-    if not t:
+    """Return a valid access token for the first connected Google account (backward compat)."""
+    accounts = _load_google_accounts()
+    if not accounts:
         raise ValueError(
-            "Google account not connected.\n\nGo to Settings → Connect Google Account."
+            "Google account not connected.\n\nGo to Settings → Email Accounts → Add Google Account."
         )
-    expires_at = t.get("expires_at", 0)
-    if time.time() < expires_at - 60:
-        return t["access_token"]
-
-    cid    = get_setting("google_client_id", "") or _GOOGLE_CLIENT_ID
-    secret = get_setting("google_client_secret", "") or _GOOGLE_CLIENT_SECRET
-    new_token = google_refresh(cid, secret, t["refresh_token"])
-    t["access_token"] = new_token
-    t["expires_at"]   = time.time() + 3500
-    _save_tokens("google", t)
-    return new_token
+    return get_google_token_for(accounts[0]["email"])
 
 
 def is_google_connected() -> bool:
-    try:
-        get_google_token()
-        return True
-    except Exception:
-        return False
+    return bool(_load_google_accounts())
 
 
 def google_email() -> str:
-    t = _load_tokens("google")
-    return t.get("email", "") if t else ""
+    accounts = _load_google_accounts()
+    return accounts[0].get("email", "") if accounts else ""
 
 
 def google_connect() -> str:
@@ -285,6 +271,118 @@ def google_connect() -> str:
 
 def google_disconnect():
     _clear_tokens("google")
+
+
+# ── Multi-account Google support ──────────────────────────────────────────────
+
+_GOOGLE_ACCOUNTS_PATH = os.path.join(_DATA_DIR, "oauth_google_accounts.json")
+
+
+def _load_google_accounts() -> list:
+    """Return list of all connected Google account token dicts."""
+    if os.path.isfile(_GOOGLE_ACCOUNTS_PATH):
+        try:
+            with open(_GOOGLE_ACCOUNTS_PATH) as f:
+                return json.load(f)
+        except Exception:
+            return []
+    # Auto-migrate legacy single-account file
+    legacy = _load_tokens("google")
+    if legacy and legacy.get("email"):
+        _save_google_accounts([legacy])
+        return [legacy]
+    return []
+
+
+def _save_google_accounts(accounts: list) -> None:
+    os.makedirs(_DATA_DIR, exist_ok=True)
+    with open(_GOOGLE_ACCOUNTS_PATH, "w") as f:
+        json.dump(accounts, f, indent=2)
+
+
+def list_google_accounts() -> list:
+    """Return [{email, expires_at, ...}] for every connected Google account."""
+    return _load_google_accounts()
+
+
+def google_connect_new() -> str:
+    """
+    OAuth2 flow for a NEW Google account (or re-authenticate an existing one).
+    Saves to the multi-account store. Returns the email address.
+    BLOCKING — run in a QThread worker.
+    """
+    client_id     = get_setting("google_client_id", "")     or _GOOGLE_CLIENT_ID
+    client_secret = get_setting("google_client_secret", "") or _GOOGLE_CLIENT_SECRET
+
+    state = secrets.token_urlsafe(16)
+    webbrowser.open(google_auth_url(client_id, state))
+
+    code, err = _run_local_server(timeout=120)
+    if err:
+        raise ValueError(f"Google authentication failed: {err}")
+    if not code:
+        raise ValueError("No authorization code received from Google.")
+
+    tokens = google_exchange_code(client_id, client_secret, code)
+    if "error" in tokens:
+        raise ValueError(f"Token exchange failed: {tokens.get('error_description', tokens)}")
+
+    email = ""
+    id_token = tokens.get("id_token", "")
+    if id_token:
+        try:
+            payload = id_token.split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            info  = json.loads(base64.b64decode(payload))
+            email = info.get("email", "")
+        except Exception:
+            pass
+
+    tokens["email"]      = email
+    tokens["expires_at"] = time.time() + tokens.get("expires_in", 3600)
+
+    # Upsert into multi-account store
+    accounts = _load_google_accounts()
+    accounts = [a for a in accounts if a.get("email") != email]
+    accounts.append(tokens)
+    _save_google_accounts(accounts)
+
+    # Keep legacy file in sync with first account for backward compat
+    _save_tokens("google", accounts[0])
+    return email
+
+
+def get_google_token_for(email: str) -> str:
+    """Return a valid access token for a specific connected Google account."""
+    accounts = _load_google_accounts()
+    acct = next((a for a in accounts if a.get("email") == email), None)
+    if not acct:
+        raise ValueError(f"Google account '{email}' is not connected.")
+
+    if time.time() < acct.get("expires_at", 0) - 60:
+        return acct["access_token"]
+
+    cid    = get_setting("google_client_id", "") or _GOOGLE_CLIENT_ID
+    secret = get_setting("google_client_secret", "") or _GOOGLE_CLIENT_SECRET
+    new_tok = google_refresh(cid, secret, acct["refresh_token"])
+    acct["access_token"] = new_tok
+    acct["expires_at"]   = time.time() + 3500
+    accounts = [acct if a.get("email") == email else a for a in accounts]
+    _save_google_accounts(accounts)
+    if accounts and accounts[0].get("email") == email:
+        _save_tokens("google", acct)
+    return new_tok
+
+
+def google_disconnect_account(email: str) -> None:
+    """Disconnect one specific Google account."""
+    accounts = [a for a in _load_google_accounts() if a.get("email") != email]
+    _save_google_accounts(accounts)
+    # Keep legacy file in sync
+    if accounts:
+        _save_tokens("google", accounts[0])
+    else:
+        _clear_tokens("google")
 
 
 # ── Microsoft OAuth2 (Authorization Code — browser-based) ────────────────────

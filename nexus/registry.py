@@ -40,10 +40,16 @@ def all_functions() -> list[dict]:
 def seed_jobtracker() -> None:
     """Register all JobTracker callables into the function registry."""
     try:
-        from modules.apple_mail_sender import send_via_apple_mail
+        from modules.quick_mailer import quick_send_email
         register(
-            "send_email", send_via_apple_mail,
-            description="Send a personalised email via Apple Mail with optional resume attachment.",
+            "send_email",
+            quick_send_email,
+            description=(
+                "Send a personalised outreach email with resume auto-attached. "
+                "Required: to_email. Optional: company, description, instructions, dry_run. "
+                'Example: call: send_email(to_email="hr@acme.com", company="Acme Corp", '
+                'description="Berlin fintech startup, hires PMs")'
+            ),
         )
     except Exception:
         pass

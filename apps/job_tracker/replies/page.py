@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from database import get_db, get_setting
-from ui.workers import EmailSyncWorker, InboxIndexWorker, DraftRegenWorker
+from ui.workers import EmailSyncWorker, InboxIndexWorker, DraftRegenWorker, SendAllDraftsWorker
 import modules.llm_summarizer as ls
 
 
@@ -304,8 +304,9 @@ class _SectionHeader(QLabel):
 class RepliesPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._sync_worker  = None
-        self._index_worker = None
+        self._sync_worker     = None
+        self._index_worker    = None
+        self._send_all_worker = None
         self._build()
 
     def _build(self):
@@ -316,7 +317,21 @@ class RepliesPage(QWidget):
         # ── Header ────────────────────────────────────────────────────────────
         top = QHBoxLayout(); top.setSpacing(8)
         t = QLabel("Replies  &  AI Drafts"); t.setObjectName("pageTitle")
-        top.addWidget(t); top.addStretch()
+        top.addWidget(t)
+        top.addSpacing(12)
+
+        # Sender selector
+        sender_lbl = QLabel("Send from:")
+        sender_lbl.setStyleSheet("color: rgba(255,255,255,0.5); font-size: 12px; background: transparent;")
+        top.addWidget(sender_lbl)
+
+        from PyQt6.QtWidgets import QComboBox
+        self.senderCombo = QComboBox()
+        self.senderCombo.setFixedHeight(30)
+        self.senderCombo.setMinimumWidth(200)
+        top.addWidget(self.senderCombo)
+
+        top.addStretch()
 
         self.statusLbl = QLabel("")
         self.statusLbl.setObjectName("pageSubtitle")
@@ -339,6 +354,13 @@ class RepliesPage(QWidget):
         self.syncBtn.clicked.connect(self._sync)
         top.addWidget(self.syncBtn)
 
+        self.sendAllBtn = QPushButton("✉  Send All Drafts")
+        self.sendAllBtn.setObjectName("accentBtn")
+        self.sendAllBtn.setFixedHeight(32)
+        self.sendAllBtn.setToolTip("Send all pending AI reply drafts with one click.")
+        self.sendAllBtn.clicked.connect(self._send_all_drafts)
+        top.addWidget(self.sendAllBtn)
+
         root.addLayout(top)
 
         self.countLbl = QLabel("")
@@ -357,9 +379,37 @@ class RepliesPage(QWidget):
         scroll.setWidget(self.listWidget)
         root.addWidget(scroll, 1)
 
+    # ── Sender combo ──────────────────────────────────────────────────────────
+
+    def _populate_sender_combo(self):
+        current = self.senderCombo.currentData()
+        self.senderCombo.blockSignals(True)
+        self.senderCombo.clear()
+        self.senderCombo.addItem("Apple Mail (default)", ("apple_mail", ""))
+        try:
+            from modules.oauth_manager import list_google_accounts
+            for acct in list_google_accounts():
+                email = acct.get("email", "")
+                if email:
+                    self.senderCombo.addItem(f"Gmail — {email}", ("smtp", email))
+        except Exception:
+            pass
+        # Restore previous selection if still present
+        for i in range(self.senderCombo.count()):
+            if self.senderCombo.itemData(i) == current:
+                self.senderCombo.setCurrentIndex(i)
+                break
+        self.senderCombo.blockSignals(False)
+
+    def _selected_sender(self) -> tuple:
+        """Returns (mode, google_email) from the combo. Defaults to apple_mail."""
+        data = self.senderCombo.currentData()
+        return data if data else ("apple_mail", "")
+
     # ── Data loading ──────────────────────────────────────────────────────────
 
     def refresh(self):
+        self._populate_sender_combo()
         conn = get_db()
 
         # TKEY-matched drafts (not yet handled)
@@ -431,6 +481,11 @@ class RepliesPage(QWidget):
         if n_d: parts.append(f"{n_d} AI draft{'s' if n_d!=1 else ''}")
         if n_t: parts.append(f"{n_t} tracked repl{'ies' if n_t!=1 else 'y'}")
         self.countLbl.setText("  ·  ".join(parts) if parts else "")
+        # Update "Send All" button label
+        self.sendAllBtn.setText(
+            f"✉  Send All Drafts ({n_d})" if n_d else "✉  Send All Drafts"
+        )
+        self.sendAllBtn.setEnabled(bool(n_d))
 
     # ── Index inbox ───────────────────────────────────────────────────────────
 
@@ -497,23 +552,25 @@ class RepliesPage(QWidget):
                                 "Could not determine recipient email from the original sender address.")
             return
 
+        mode, google_email = self._selected_sender()
+        sender_desc = f"Gmail ({google_email})" if mode == "smtp" else "Apple Mail"
+
         confirm = QMessageBox.question(
             self, "Send Reply",
-            f"Send this reply via Apple Mail?\n\nTo: {to_email}\nSubject: {subject[:60]}",
+            f"Send via {sender_desc}?\n\nTo: {to_email}\nSubject: {subject[:60]}",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if confirm != QMessageBox.StandardButton.Yes:
             return
 
         try:
-            from modules.apple_mail_sender import send_via_apple_mail
-            send_via_apple_mail(
-                to_emails=[to_email],
-                subject=subject,
-                body=draft,
-                tracking_key="",  # reply — no new TKEY needed
-            )
-            # Mark as handled in DB
+            if mode == "smtp" and google_email:
+                from modules.mail_client import send_email
+                send_email([to_email], subject, draft, from_account_email=google_email)
+            else:
+                from modules.apple_mail_sender import send_via_apple_mail
+                send_via_apple_mail(to_emails=[to_email], subject=subject, body=draft)
+
             conn = get_db()
             conn.execute("UPDATE inbox_index SET reply_status='sent' WHERE id=?", (row_id,))
             conn.commit()
@@ -522,3 +579,64 @@ class RepliesPage(QWidget):
             self.refresh()
         except Exception as e:
             QMessageBox.critical(self, "Send Failed", str(e))
+
+    # ── Send all pending drafts ────────────────────────────────────────────────
+
+    def _send_all_drafts(self):
+        if self._send_all_worker:
+            return
+
+        mode, google_email = self._selected_sender()
+        sender_desc = f"Gmail ({google_email})" if mode == "smtp" else "Apple Mail"
+
+        # Count pending drafts
+        conn = get_db()
+        count = conn.execute("""
+            SELECT COUNT(*) FROM inbox_index
+            WHERE tkey IS NOT NULL
+              AND reply_status NOT IN ('handled','sent')
+              AND ai_reply_draft IS NOT NULL
+              AND trim(ai_reply_draft) != ''
+        """).fetchone()[0]
+        conn.close()
+
+        if not count:
+            QMessageBox.information(self, "No Drafts", "No pending AI drafts to send.")
+            return
+
+        confirm = QMessageBox.question(
+            self, "Send All Drafts",
+            f"Send {count} reply draft{'s' if count != 1 else ''} via {sender_desc}?\n\n"
+            "All drafts will be marked as sent.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        self.sendAllBtn.setEnabled(False)
+        self.sendAllBtn.setText("Sending…")
+        self.statusLbl.setText(f"Sending {count} drafts…")
+
+        self._send_all_worker = SendAllDraftsWorker(
+            sender_mode=mode,
+            google_account_email=google_email,
+        )
+        self._send_all_worker.progress.connect(self._on_send_all_progress)
+        self._send_all_worker.done.connect(self._on_send_all_done)
+        self._send_all_worker.finished.connect(
+            lambda: setattr(self, "_send_all_worker", None)
+        )
+        self._send_all_worker.start()
+
+    def _on_send_all_progress(self, row_id: int, email: str, success: bool):
+        icon = "✓" if success else "✕"
+        self.statusLbl.setText(f"{icon}  {email}")
+
+    def _on_send_all_done(self, sent: int, failed: int, errors: list):
+        self.statusLbl.setText(
+            f"Done — {sent} sent" + (f", {failed} failed" if failed else "")
+        )
+        if errors:
+            QMessageBox.warning(self, "Some Sends Failed",
+                                "\n".join(errors[:5]))
+        self.refresh()

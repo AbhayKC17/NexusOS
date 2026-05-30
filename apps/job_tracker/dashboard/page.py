@@ -62,7 +62,22 @@ class DashboardPage(QWidget):
     # ── Layout ────────────────────────────────────────────────────────────────
 
     def _build(self):
-        root = QVBoxLayout(self)
+        # Outer layout holds only a scroll area so all content is reachable at any window size
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        _scroll = QScrollArea()
+        _scroll.setWidgetResizable(True)
+        _scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        _scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        _scroll.setFrameShape(QFrame.Shape.NoFrame)
+
+        _inner = QWidget()
+        _scroll.setWidget(_inner)
+        outer.addWidget(_scroll)
+
+        root = QVBoxLayout(_inner)
         root.setContentsMargins(28, 24, 28, 16)
         root.setSpacing(14)
 
@@ -321,7 +336,7 @@ class DashboardPage(QWidget):
             (len(categories), "Categories",        "#F97316", f"{len(investors_set)} investors"),
             (funding_str,     "Total Funding",     "#22C55E", f"across {funded} companies"),
         ]
-        cols = 4
+        cols = 3
         for i, (val, lbl, color, sub) in enumerate(stats):
             card = StatCard(val, lbl, color, sub)
             self._stats_grid.addWidget(card, i // cols, i % cols)
