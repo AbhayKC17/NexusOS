@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# Databases (user data — not source code)
+*.db
+*.db-shm
+*.db-wal
+
+# OAuth credentials (sensitive)
+apps/job_tracker/data/oauth_google.json
+apps/job_tracker/data/oauth_google_accounts.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build / dist
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log

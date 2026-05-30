@@ -185,7 +185,7 @@ class MainWindow(QMainWindow):
         sl.addWidget(self.modelDot)
         self.syncDot = QLabel("  Auto-sync: every 15 min")
         self.syncDot.setStyleSheet(
-            "color: rgba(255,255,255,0.25); font-size: 11px; background: transparent; padding: 2px 12px 12px 12px;"
+            "color: rgba(0,0,0,0.35); font-size: 11px; background: transparent; padding: 2px 12px 12px 12px;"
         )
         sl.addWidget(self.syncDot)
         root.addWidget(sidebar)
@@ -212,7 +212,7 @@ class MainWindow(QMainWindow):
         # Status bar
         sb = QStatusBar(); sb.setFixedHeight(26); self.setStatusBar(sb)
         self._statusMsg = QLabel("Ready")
-        self._statusMsg.setStyleSheet("color: rgba(255,255,255,0.35); background: transparent;")
+        self._statusMsg.setStyleSheet("color: rgba(0,0,0,0.42); background: transparent;")
         sb.addWidget(self._statusMsg)
 
         self.settPage.load_settings()
