@@ -103,6 +103,33 @@ class CampaignPage(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
+        from PyQt6.QtWidgets import QTabWidget
+        from campaign.ai_tab import AIAutomationTab
+
+        tabs = QTabWidget()
+        tabs.setDocumentMode(True)
+        tabs.setStyleSheet(
+            "QTabWidget::pane{border:none; margin:0;}"
+            "QTabBar::tab{padding:8px 18px; font-size:12px; font-weight:600;}"
+            "QTabBar::tab:selected{border-bottom:2px solid #6366F1; color:#A5B4FC;}"
+        )
+
+        # Tab 1 — Campaign Sender (existing content)
+        campaign_w = QWidget()
+        self._build_campaign_tab(campaign_w)
+        tabs.addTab(campaign_w, "✉  Campaign")
+
+        # Tab 2 — AI Automation
+        self._ai_tab = AIAutomationTab()
+        tabs.addTab(self._ai_tab, "✦  AI Automation")
+
+        root.addWidget(tabs)
+
+    def _build_campaign_tab(self, container: QWidget):
+        root = QVBoxLayout(container)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
         # ── Top bar ───────────────────────────────────────────────────────────
         bar = QFrame()
         bar.setObjectName("pageHeader")
@@ -380,6 +407,8 @@ class CampaignPage(QWidget):
     # ──────────────────────────────────────────────── refresh ────────────────────
 
     def refresh(self):
+        if hasattr(self, "_ai_tab"):
+            self._ai_tab.refresh()
         self._reload_sender_combo()
 
         # AI badge

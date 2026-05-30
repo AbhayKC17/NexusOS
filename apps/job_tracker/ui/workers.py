@@ -276,6 +276,72 @@ class DraftRegenWorker(QThread):
             self.error.emit(self.row_id, str(e))
 
 
+class GroqDraftWorker(QThread):
+    """
+    Two-step per-company drafting:
+      Step 1 — one lightweight call to extract all contacts.
+      Step 2 — one small call (~350 tokens) per company to draft its email.
+    Emits draft_ready progressively so cards appear in the UI as they arrive.
+    """
+    contacts_found = pyqtSignal(int)             # total contacts extracted
+    draft_ready    = pyqtSignal(int, int, dict)  # index, total, draft_dict
+    done           = pyqtSignal(int)             # total drafted
+    error          = pyqtSignal(str)
+
+    def __init__(self, user_message: str):
+        super().__init__()
+        self.user_message = user_message
+        self._stop        = False
+        _connect_cleanup(self)
+
+    def cancel(self):
+        self._stop = True
+
+    def run(self):
+        try:
+            from modules.groq_client import extract_contacts, draft_single_email
+
+            # Step 1: extract all contacts in one call
+            contacts = extract_contacts(self.user_message)
+            if not contacts:
+                self.error.emit(
+                    "No email addresses found in your message.\n"
+                    "Paste company emails along with your instructions."
+                )
+                return
+
+            total  = len(contacts)
+            intent = self.user_message[:300]
+            self.contacts_found.emit(total)
+
+            # Step 2: draft one email per company
+            drafted = 0
+            for i, contact in enumerate(contacts):
+                if self._stop:
+                    break
+                try:
+                    draft = draft_single_email(
+                        email=contact.get("email", ""),
+                        company=contact.get("company", ""),
+                        context=contact.get("context", ""),
+                        user_intent=intent,
+                    )
+                except Exception as exc:
+                    draft = {
+                        "email":   contact.get("email", "?"),
+                        "company": contact.get("company", ""),
+                        "subject": "",
+                        "body":    f"[Draft error: {exc}]",
+                    }
+                self.draft_ready.emit(i, total, draft)
+                drafted += 1
+
+            self.done.emit(drafted)
+
+        except Exception as exc:
+            self.error.emit(str(exc))
+
+
 class SendAllDraftsWorker(QThread):
     """
     Sends all pending AI-drafted replies from inbox_index.
