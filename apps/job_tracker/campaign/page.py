@@ -106,34 +106,54 @@ def _context_lines(raw: dict) -> list[str]:
 # ── Run status badge widget ────────────────────────────────────────────────────
 
 class _RunRow(QFrame):
-    """Single row in the Active Runs list showing run progress."""
+    """Single row in the Active Runs list — shows live stats, Stop, and Remove buttons."""
 
     def __init__(self, run_id: int, label: str, parent=None):
         super().__init__(parent)
         self.run_id = run_id
         self.setObjectName("card")
-        self.setFixedHeight(52)
-        lay = QHBoxLayout(self)
+        self.setFixedHeight(56)
+        self.setStyleSheet(
+            "QFrame#card { border-radius: 8px; border: 1px solid rgba(0,0,0,0.08); }"
+        )
+
+        lay = QVBoxLayout(self)
         lay.setContentsMargins(12, 6, 10, 6)
-        lay.setSpacing(8)
+        lay.setSpacing(4)
+
+        # ── Top row: dot + label + Stop ────────────────────────────────────────
+        top = QHBoxLayout()
+        top.setSpacing(8)
 
         self.statusDot = QLabel("●")
-        self.statusDot.setStyleSheet("color: #0067C0; font-size: 10px; background: transparent;")
-        lay.addWidget(self.statusDot)
+        self.statusDot.setStyleSheet("color: #0067C0; font-size: 11px; background: transparent;")
+        top.addWidget(self.statusDot)
 
         self.labelLbl = QLabel(label)
-        self.labelLbl.setStyleSheet("font-size: 12px; font-weight: 600; background: transparent;")
-        lay.addWidget(self.labelLbl, 1)
+        self.labelLbl.setStyleSheet(
+            "font-size: 12px; font-weight: 600; background: transparent; color: #1A1A1A;"
+        )
+        top.addWidget(self.labelLbl, 1)
 
-        self.statsLbl = QLabel("—")
-        self.statsLbl.setStyleSheet("font-size: 11px; color: rgba(0,0,0,0.5); background: transparent;")
-        lay.addWidget(self.statsLbl)
-
-        self.stopBtn = QPushButton("■ Stop")
+        self.stopBtn = QPushButton("■  Stop")
         self.stopBtn.setObjectName("dangerBtn")
-        self.stopBtn.setFixedHeight(26)
-        self.stopBtn.setFixedWidth(64)
-        lay.addWidget(self.stopBtn)
+        self.stopBtn.setFixedHeight(24)
+        self.stopBtn.setFixedWidth(68)
+        top.addWidget(self.stopBtn)
+
+        self.removeBtn = QPushButton("✕")
+        self.removeBtn.setObjectName("subtleBtn")
+        self.removeBtn.setFixedSize(26, 24)
+        self.removeBtn.setToolTip("Remove this run from the list")
+        top.addWidget(self.removeBtn)
+        lay.addLayout(top)
+
+        # ── Bottom row: stats ──────────────────────────────────────────────────
+        self.statsLbl = QLabel("—")
+        self.statsLbl.setStyleSheet(
+            "font-size: 11px; color: rgba(0,0,0,0.45); background: transparent;"
+        )
+        lay.addWidget(self.statsLbl)
 
     def update_run(self, run: dict):
         st = run.get("status", "")
@@ -142,17 +162,31 @@ class _RunRow(QFrame):
             "completed": "#107C10",
             "failed":    "#C42B1C",
             "stopped":   "#9D5D00",
+            "pending":   "#9D5D00",
         }.get(st, "#9D5D00")
         self.statusDot.setStyleSheet(
-            f"color: {dot_color}; font-size: 10px; background: transparent;"
+            f"color: {dot_color}; font-size: 11px; background: transparent;"
         )
+
         sent    = run.get("sent", 0) or 0
         failed  = run.get("failed", 0) or 0
         skipped = run.get("skipped", 0) or 0
+        status_label = {
+            "running":   "● Running",
+            "completed": "✓ Completed",
+            "failed":    "✗ Failed",
+            "stopped":   "■ Stopped",
+            "pending":   "… Pending",
+        }.get(st, st)
         self.statsLbl.setText(
-            f"✓ {sent}  ✗ {failed}  — {skipped}  [{st}]"
+            f"{status_label}  ·  ✓ {sent} sent  ✗ {failed} failed  — {skipped} skipped"
         )
-        self.stopBtn.setEnabled(st == "running")
+
+        is_running = (st == "running")
+        self.stopBtn.setEnabled(is_running)
+        self.stopBtn.setVisible(is_running)
+        # Remove button is always visible (for any non-running state too via confirm)
+        self.setFixedHeight(56 if is_running else 50)
 
 
 # ── Main page ──────────────────────────────────────────────────────────────────
@@ -773,13 +807,14 @@ class CampaignPage(QWidget):
                 w.deleteLater()
 
         for run in runs:
-            rid = run["id"]
+            rid   = run["id"]
             acct  = run.get("apple_mail_account") or ""
             mode  = run.get("sender_mode") or ""
             label = f"#{rid}  {acct or mode}"
             if rid not in self._run_rows:
                 row = _RunRow(rid, label)
                 row.stopBtn.clicked.connect(lambda _, r=rid: self._stop_run(r))
+                row.removeBtn.clicked.connect(lambda _, r=rid: self._remove_run(r))
                 self._runs_lay.insertWidget(self._runs_lay.count() - 1, row)
                 self._run_rows[rid] = row
             self._run_rows[rid].update_run(run)
@@ -1019,6 +1054,76 @@ class CampaignPage(QWidget):
             self.statusLbl.setText(f"■  Run #{run_id} stopping…")
         except Exception as e:
             self.statusLbl.setText(f"Stop error: {str(e)[:60]}")
+
+    def _remove_run(self, run_id: int):
+        """Stop (if running) then delete the run record and its row from the UI."""
+        conn = get_db()
+        run = conn.execute(
+            "SELECT status, sent, failed, skipped FROM campaign_runs WHERE id=?", (run_id,)
+        ).fetchone()
+        conn.close()
+
+        if not run:
+            self._drop_run_row(run_id)
+            return
+
+        run = dict(run)
+        is_running = run.get("status") == "running"
+
+        msg = f"Remove Run #{run_id}?"
+        if is_running:
+            msg = (
+                f"Run #{run_id} is still running.\n\n"
+                f"Stop it and remove it from the list?\n\n"
+                f"  Sent: {run.get('sent', 0)}  |  Failed: {run.get('failed', 0)}  "
+                f"|  Skipped: {run.get('skipped', 0)}"
+            )
+        else:
+            msg = (
+                f"Remove Run #{run_id} from the list?\n\n"
+                f"  Sent: {run.get('sent', 0)}  |  Failed: {run.get('failed', 0)}  "
+                f"|  Skipped: {run.get('skipped', 0)}\n\n"
+                "The applications it already sent remain in the database."
+            )
+
+        reply = QMessageBox.question(
+            self, "Remove Run", msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Stop the background thread if still running
+        if is_running:
+            try:
+                from modules.campaign_runner import stop_run
+                stop_run(run_id)
+            except Exception:
+                pass
+
+        # Delete from DB
+        conn = get_db()
+        conn.execute("DELETE FROM campaign_runs WHERE id=?", (run_id,))
+        # Release any applications that were claimed by this run but not sent
+        conn.execute(
+            "UPDATE applications SET status='pending', campaign_run_id=NULL "
+            "WHERE campaign_run_id=? AND status='in_progress'",
+            (run_id,),
+        )
+        conn.commit()
+        conn.close()
+
+        self._drop_run_row(run_id)
+        self.statusLbl.setText(f"Run #{run_id} removed.")
+        self._reload_table_full()
+        self._refresh_runs_panel()
+
+    def _drop_run_row(self, run_id: int):
+        """Remove the _RunRow widget from the panel without a DB call."""
+        w = self._run_rows.pop(run_id, None)
+        if w:
+            self._runs_lay.removeWidget(w)
+            w.deleteLater()
 
     def _on_prog(self, _id, company, status):
         self._sent = getattr(self, "_sent", 0) + 1
