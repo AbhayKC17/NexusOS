@@ -102,10 +102,15 @@ def _run_thread(run_id: int, stop_evt: threading.Event) -> None:
     errors: list = []
 
     while not stop_evt.is_set():
-        # Fetch fresh pending list every iteration
+        # Only fetch apps that have a contact email — avoids an infinite loop
+        # where no-email apps are claimed, released to pending, and claimed again.
         conn = get_db()
         rows = conn.execute(
-            "SELECT id FROM applications WHERE status='pending' ORDER BY created_at"
+            "SELECT id FROM applications "
+            "WHERE status='pending' "
+            "  AND contact_email IS NOT NULL "
+            "  AND trim(contact_email) != '' "
+            "ORDER BY id ASC"
         ).fetchall()
         pending_ids = [r["id"] for r in rows]
         conn.close()
@@ -123,7 +128,7 @@ def _run_thread(run_id: int, stop_evt: threading.Event) -> None:
                 break
 
         if claimed_id is None:
-            # All pending rows are claimed by concurrent runs — wait briefly
+            # All pending rows are currently claimed by concurrent runs — wait briefly
             stop_evt.wait(2)
             continue
 
@@ -132,8 +137,13 @@ def _run_thread(run_id: int, stop_evt: threading.Event) -> None:
         conn.close()
 
         if not app or not app["contact_email"]:
+            # App email disappeared between query and claim (edge case) — skip permanently
             conn = get_db()
-            _release(conn, claimed_id)
+            conn.execute(
+                "UPDATE applications SET status='pending', campaign_run_id=NULL "
+                "WHERE id=? AND status='in_progress'", (claimed_id,)
+            )
+            conn.commit()
             conn.close()
             skipped += 1
             _set_run(run_id, sent=sent, failed=failed, skipped=skipped,
