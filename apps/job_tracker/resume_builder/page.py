@@ -85,7 +85,7 @@ class ResumePage(QWidget):
         self.statusLbl = QLabel("")
         self.statusLbl.setWordWrap(True)
         self.statusLbl.setStyleSheet(
-            "color: rgba(255,255,255,0.45); background: transparent; font-size: 12px;"
+            "color: rgba(0,0,0,0.5); background: transparent; font-size: 12px;"
         )
         lay.addWidget(self.statusLbl)
 
@@ -125,7 +125,7 @@ class ResumePage(QWidget):
 
         self.charCountLbl = QLabel("0 words / target 30–32 words")
         self.charCountLbl.setStyleSheet(
-            "color: rgba(255,255,255,0.35); background: transparent; font-size: 11px;"
+            "color: rgba(0,0,0,0.42); background: transparent; font-size: 11px;"
         )
         lay.addWidget(self.charCountLbl)
 
@@ -197,7 +197,7 @@ class ResumePage(QWidget):
     def _field_label(self, text: str) -> QLabel:
         lbl = QLabel(text)
         lbl.setStyleSheet(
-            "color: rgba(255,255,255,0.55); background: transparent; font-size: 12px;"
+            "color: rgba(0,0,0,0.55); background: transparent; font-size: 12px;"
         )
         return lbl
 

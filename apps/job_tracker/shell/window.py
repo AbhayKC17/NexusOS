@@ -79,7 +79,7 @@ class _AppBrand(QWidget):
 
         mark = QLabel("✦")
         mark.setStyleSheet(
-            "color: #6366F1; font-size: 22px; font-weight: 700; background: transparent;"
+            "color: #0067C0; font-size: 22px; font-weight: 700; background: transparent;"
         )
         icon_row.addWidget(mark)
 
@@ -271,7 +271,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(sb)
         self._status_lbl = QLabel("Ready")
         self._status_lbl.setStyleSheet(
-            "color: rgba(255,255,255,0.35); background: transparent;"
+            "color: rgba(0,0,0,0.45); background: transparent;"
         )
         sb.addWidget(self._status_lbl)
 
@@ -316,7 +316,7 @@ class MainWindow(QMainWindow):
             label = f"repl{'y' if count == 1 else 'ies'}"
             dot.setText(f"  ✓  {count} new {label}")
             dot.setStyleSheet(
-                "color: #6CCB5F; font-size: 11px; background: transparent; padding: 2px 14px 12px 14px;"
+                "color: #107C10; font-size: 11px; background: transparent; padding: 2px 14px 12px 14px;"
             )
             current = self._stack.currentWidget()
             if current in (self._repl, self._dash, self._data):
@@ -324,7 +324,7 @@ class MainWindow(QMainWindow):
         else:
             dot.setText("  Auto-sync: every 15 min")
             dot.setStyleSheet(
-                "color: rgba(255,255,255,0.32); font-size: 11px; background: transparent; padding: 2px 14px 12px 14px;"
+                "color: rgba(0,0,0,0.38); font-size: 11px; background: transparent; padding: 2px 14px 12px 14px;"
             )
 
     # ── LLM loader ────────────────────────────────────────────────────────────
@@ -335,7 +335,7 @@ class MainWindow(QMainWindow):
         if not path or not os.path.exists(path):
             self._sidebar.model_dot.setText("  ◯  No model — see Settings")
             self._sidebar.model_dot.setStyleSheet(
-                "color: #FCE100; font-size: 11px; background: transparent; padding: 5px 14px;"
+                "color: #9D5D00; font-size: 11px; background: transparent; padding: 5px 14px;"
             )
             return
 
@@ -353,7 +353,7 @@ class MainWindow(QMainWindow):
         if ok:
             dot.setText("  ●  Mistral 7B ready")
             dot.setStyleSheet(
-                "color: #6CCB5F; font-size: 11px; background: transparent; padding: 5px 14px;"
+                "color: #107C10; font-size: 11px; background: transparent; padding: 5px 14px;"
             )
             self._status_lbl.setText("Mistral 7B loaded — AI features active")
             page = self._stack.currentWidget()
@@ -362,6 +362,6 @@ class MainWindow(QMainWindow):
         else:
             dot.setText("  ✕  Model failed")
             dot.setStyleSheet(
-                "color: #FF99A4; font-size: 11px; background: transparent; padding: 5px 14px;"
+                "color: #C42B1C; font-size: 11px; background: transparent; padding: 5px 14px;"
             )
             self._status_lbl.setText(f"Model error: {msg[:80]}")

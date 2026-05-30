@@ -58,13 +58,25 @@ def process_excel(filepath, filename):
                 row_uuid = str(uuid.uuid4())
                 results['new_uuid_generated'] += 1
 
-            # Check duplicate
+            # Check duplicate by UUID
             existing = conn.execute(
                 "SELECT id FROM applications WHERE uuid = ?", (row_uuid,)
             ).fetchone()
             if existing:
                 results['duplicates_skipped'] += 1
                 continue
+
+            # Also check duplicate by company + email (catches re-imports of same data)
+            company_val = get_col('company')
+            email_val   = get_col('contact_email')
+            if company_val and email_val:
+                dup_by_match = conn.execute(
+                    "SELECT id FROM applications WHERE company=? AND contact_email=?",
+                    (company_val, email_val),
+                ).fetchone()
+                if dup_by_match:
+                    results['duplicates_skipped'] += 1
+                    continue
 
             def get_col(field):
                 mapped = col_map.get(field)

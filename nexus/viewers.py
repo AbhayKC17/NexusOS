@@ -326,10 +326,10 @@ class NodeInspector(QWidget):
             self.open_file_requested.emit(self._node)
 
 
-# ── Excel Viewer / Editor ─────────────────────────────────────────────────────
+# ── Excel Viewer / Editor — now powered by the full Office spreadsheet ────────
 
 class ExcelViewer(QWidget):
-    """Editable spreadsheet view backed by openpyxl."""
+    """Full spreadsheet editor (uses nexus.office.SpreadsheetEditor)."""
 
     def __init__(self, path: str, parent=None):
         super().__init__(parent)
@@ -343,71 +343,22 @@ class ExcelViewer(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
-
-        # Toolbar
-        bar = QFrame()
-        bar.setObjectName("card")
-        bar.setFixedHeight(44)
-        bar_lay = QHBoxLayout(bar)
-        bar_lay.setContentsMargins(12, 6, 12, 6)
-        bar_lay.setSpacing(8)
-
-        name_lbl = QLabel(os.path.basename(self._path))
-        name_lbl.setStyleSheet(
-            "color: rgba(239,239,239,0.65); font-size: 12px; background: transparent;"
-        )
-        bar_lay.addWidget(name_lbl)
-        bar_lay.addStretch()
-
-        save_btn = QPushButton("Save")
-        save_btn.setObjectName("accentBtn")
-        save_btn.setFixedHeight(28)
-        save_btn.clicked.connect(self._save)
-        bar_lay.addWidget(save_btn)
-        lay.addWidget(bar)
-
-        self._table = QTableWidget()
-        self._table.setAlternatingRowColors(True)
-        self._table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Interactive
-        )
-        lay.addWidget(self._table)
+        try:
+            from nexus.office.spreadsheet import SpreadsheetEditor
+            title = os.path.splitext(os.path.basename(self._path))[0]
+            editor = SpreadsheetEditor(path=self._path, title=title)
+            lay.addWidget(editor)
+        except Exception as e:
+            err = QLabel(f"Could not load spreadsheet:\n{e}")
+            err.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            err.setStyleSheet("color: rgba(0,0,0,0.45); font-size: 13px; padding: 40px;")
+            lay.addWidget(err)
 
     def _load(self):
-        try:
-            import openpyxl
-            self._wb = openpyxl.load_workbook(self._path, data_only=True)
-            self._ws = self._wb.active
-            nrows = self._ws.max_row or 0
-            ncols = self._ws.max_column or 0
-            self._table.setRowCount(nrows)
-            self._table.setColumnCount(ncols)
-            for r in range(1, nrows + 1):
-                for c in range(1, ncols + 1):
-                    val = self._ws.cell(r, c).value
-                    self._table.setItem(r - 1, c - 1,
-                                        QTableWidgetItem("" if val is None else str(val)))
-        except ImportError:
-            self._table.setRowCount(1)
-            self._table.setColumnCount(1)
-            self._table.setItem(0, 0, QTableWidgetItem("openpyxl not installed"))
-        except Exception as e:
-            self._table.setRowCount(1)
-            self._table.setColumnCount(1)
-            self._table.setItem(0, 0, QTableWidgetItem(f"Error: {e}"))
+        pass  # handled by SpreadsheetEditor
 
     def _save(self):
-        if not self._wb or not self._ws:
-            return
-        try:
-            for r in range(self._table.rowCount()):
-                for c in range(self._table.columnCount()):
-                    item = self._table.item(r, c)
-                    self._ws.cell(r + 1, c + 1, item.text() if item else "")
-            self._wb.save(self._path)
-            QMessageBox.information(self, "Saved", f"Saved — {os.path.basename(self._path)}")
-        except Exception as e:
-            QMessageBox.warning(self, "Save Error", str(e))
+        pass  # handled by SpreadsheetEditor
 
 
 # ── Text / Code Viewer ────────────────────────────────────────────────────────

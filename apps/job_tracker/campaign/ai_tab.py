@@ -69,8 +69,8 @@ class _DraftCard(QFrame):
 
         num = QLabel(f"#{index + 1}")
         num.setStyleSheet(
-            "font-size:10px; font-weight:700; color:#A5B4FC; "
-            "background:rgba(99,102,241,0.15); padding:2px 7px; border-radius:4px;"
+            "font-size:10px; font-weight:700; color:#0067C0; "
+            "background:rgba(0,103,192,0.10); padding:2px 7px; border-radius:4px;"
         )
         hdr.addWidget(num)
 
@@ -80,7 +80,7 @@ class _DraftCard(QFrame):
 
         if self._company:
             co_lbl = QLabel(f"— {self._company}")
-            co_lbl.setStyleSheet("font-size:12px; color:rgba(255,255,255,0.45); background:transparent;")
+            co_lbl.setStyleSheet("font-size:12px; color:rgba(0,0,0,0.5); background:transparent;")
             hdr.addWidget(co_lbl)
 
         hdr.addStretch()
@@ -94,7 +94,7 @@ class _DraftCard(QFrame):
         # ── Subject ───────────────────────────────────────────────────────────
         subj_lbl = QLabel("Subject:")
         subj_lbl.setStyleSheet("font-size:10px; font-weight:700; letter-spacing:1px; "
-                               "color:rgba(255,255,255,0.35); background:transparent;")
+                               "color:rgba(0,0,0,0.38); background:transparent;")
         lay.addWidget(subj_lbl)
 
         self.subjEdit = QLineEdit(d.get("subject", ""))
@@ -104,7 +104,7 @@ class _DraftCard(QFrame):
         # ── Body ──────────────────────────────────────────────────────────────
         body_lbl = QLabel("Body:")
         body_lbl.setStyleSheet("font-size:10px; font-weight:700; letter-spacing:1px; "
-                               "color:rgba(255,255,255,0.35); background:transparent;")
+                               "color:rgba(0,0,0,0.38); background:transparent;")
         lay.addWidget(body_lbl)
 
         self.bodyEdit = QTextEdit()
@@ -112,8 +112,8 @@ class _DraftCard(QFrame):
         self.bodyEdit.setFont(QFont("Menlo, Courier New, monospace", 11))
         self.bodyEdit.setMinimumHeight(180)
         self.bodyEdit.setStyleSheet(
-            "QTextEdit{background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); "
-            "border-radius:6px; padding:8px; color:rgba(255,255,255,0.85);}"
+            "QTextEdit{background:#FAFAFA; border:1px solid rgba(0,0,0,0.10);"
+            "border-radius:6px; padding:8px; color:#1A1A1A;}"
         )
         lay.addWidget(self.bodyEdit)
 
@@ -162,7 +162,7 @@ class AIAutomationTab(QWidget):
 
         inst_lbl = QLabel("Tell the AI what to send:")
         inst_lbl.setStyleSheet(
-            "font-size:12px; font-weight:600; color:rgba(255,255,255,0.7); background:transparent;"
+            "font-size:12px; font-weight:600; color:rgba(0,0,0,0.75); background:transparent;"
         )
         tl.addWidget(inst_lbl)
 
@@ -180,8 +180,8 @@ class AIAutomationTab(QWidget):
         self.inputArea.setFont(QFont("SF Pro Display, Helvetica Neue, Arial", 12))
         self.inputArea.setStyleSheet(
             "QTextEdit{"
-            "background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.10); "
-            "border-radius:10px; padding:12px; color:rgba(255,255,255,0.85);"
+            "background:#FAFAFA; border:1px solid rgba(0,0,0,0.10);"
+            "border-radius:10px; padding:12px; color:#1A1A1A;"
             "}"
             "QTextEdit:focus{border:1px solid rgba(99,102,241,0.6);}"
         )
@@ -191,7 +191,7 @@ class AIAutomationTab(QWidget):
         ctrl = QHBoxLayout(); ctrl.setSpacing(10)
 
         sender_lbl = QLabel("Send from:")
-        sender_lbl.setStyleSheet("font-size:11px; color:rgba(255,255,255,0.5); background:transparent;")
+        sender_lbl.setStyleSheet("font-size:11px; color:rgba(0,0,0,0.5); background:transparent;")
         ctrl.addWidget(sender_lbl)
 
         self.senderCombo = QComboBox()
@@ -248,7 +248,7 @@ class AIAutomationTab(QWidget):
 
         # Divider
         div = QFrame(); div.setFrameShape(QFrame.Shape.HLine)
-        div.setStyleSheet("color:rgba(255,255,255,0.07); margin:0;")
+        div.setStyleSheet("color:rgba(0,0,0,0.08); margin:0;")
         root.addWidget(div)
 
         # ── Draft cards area ──────────────────────────────────────────────────
@@ -261,7 +261,7 @@ class AIAutomationTab(QWidget):
         self.draftCountLbl = QLabel("")
         self.draftCountLbl.setStyleSheet(
             "font-size:11px; font-weight:700; letter-spacing:1px; "
-            "color:rgba(255,255,255,0.35); background:transparent;"
+            "color:rgba(0,0,0,0.38); background:transparent;"
         )
         draft_hdr.addWidget(self.draftCountLbl)
         draft_hdr.addStretch()
@@ -283,7 +283,7 @@ class AIAutomationTab(QWidget):
         self.resultLbl = QLabel("")
         self.resultLbl.setWordWrap(True)
         self.resultLbl.setStyleSheet(
-            "font-size:11px; color:rgba(255,255,255,0.5); background:transparent;"
+            "font-size:11px; color:rgba(0,0,0,0.5); background:transparent;"
         )
         dl.addWidget(self.resultLbl)
 
@@ -300,8 +300,8 @@ class AIAutomationTab(QWidget):
         )
         placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         placeholder.setStyleSheet(
-            "color:rgba(255,255,255,0.2); font-size:13px; "
-            "background:rgba(255,255,255,0.02); border-radius:10px; padding:40px;"
+            "color:rgba(0,0,0,0.35); font-size:13px; "
+            "background:#F5F5F5; border-radius:10px; padding:40px;"
         )
         self._cards_lay.addWidget(placeholder)
         self._placeholder = placeholder

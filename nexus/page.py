@@ -30,6 +30,9 @@ from nexus.graph_db import (
 )
 from nexus.canvas import GraphCanvas
 from nexus.viewers import NodeInspector, ExcelViewer, TextViewer, ImageViewer, NoteEditor, AppViewer
+from nexus.office.document     import DocumentEditor
+from nexus.office.spreadsheet  import SpreadsheetEditor
+from nexus.office.presentation import PresentationEditor
 from nexus.registry import seed_jobtracker
 from nexus.ai_agent import AgentWorker
 
@@ -162,6 +165,7 @@ class _RightPanel(QTabWidget):
 
         ntype = node.get("type", "")
         path  = node.get("path") or ""
+        label = node.get("label", "")
 
         if ntype == "APP":
             widget = AppViewer(node)
@@ -170,12 +174,25 @@ class _RightPanel(QTabWidget):
             widget = NoteEditor(node)
         elif ntype == "FILE_EXCEL" and path:
             widget = ExcelViewer(path)
+        elif ntype == "FILE_EXCEL" and not path:
+            # New spreadsheet with no file yet
+            widget = SpreadsheetEditor(title=label or "Sheet1")
+        elif ntype == "DOC":
+            widget = DocumentEditor(path=path or None, title=label or "Document")
+        elif ntype == "PPT":
+            widget = PresentationEditor(path=path or None, title=label or "Presentation")
         elif ntype in ("FILE_TEXT", "FILE_CODE") and path:
             widget = TextViewer(path)
         elif ntype == "FILE_IMAGE" and path:
             widget = ImageViewer(path)
         elif path and os.path.exists(path):
-            widget = TextViewer(path)
+            ext = os.path.splitext(path)[1].lower()
+            if ext in (".xlsx", ".xls", ".csv"):
+                widget = ExcelViewer(path)
+            elif ext in (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"):
+                widget = ImageViewer(path)
+            else:
+                widget = TextViewer(path)
         else:
             self.setCurrentIndex(0)
             return
@@ -486,12 +503,15 @@ class NexusPage(QWidget):
             "QMenu::item:selected { background: rgba(99,102,241,0.25); }"
         )
         for label, ntype in [
-            ("✎  New Note",         "NOTE"),
-            ("⊞  Import File…",     "FILE_EXCEL"),
-            ("@  Add API",          "API"),
-            ("ƒ  Add Function",     "FUNCTION"),
-            ("⊡  Add App",          "APP"),
-            ("⊡  Add Data Source",  "DATA"),
+            ("✎  New Note",           "NOTE"),
+            ("📄  New Document",       "DOC"),
+            ("📊  New Spreadsheet",    "FILE_EXCEL"),
+            ("📊  New Presentation",   "PPT"),
+            ("⊞  Import File…",       "FILE_EXCEL"),
+            ("@  Add API",            "API"),
+            ("ƒ  Add Function",       "FUNCTION"),
+            ("⊡  Add App",            "APP"),
+            ("⊡  Add Data Source",    "DATA"),
         ]:
             act = menu.addAction(label)
             act.triggered.connect(lambda _, t=ntype: self._add_node_dialog(t))

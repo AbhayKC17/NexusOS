@@ -193,7 +193,7 @@ class AssistantPage(QWidget):
         prompt = f"[INST] {sys_prompt}{ctx}\n\n{hist}Assistant: [/INST]"
 
         self._typing = QLabel("✦  Mistral is thinking…")
-        self._typing.setStyleSheet("color: rgba(255,255,255,0.35); font-size: 13px; background: transparent; padding: 4px 0;")
+        self._typing.setStyleSheet("color: rgba(0,0,0,0.42); font-size: 13px; background: transparent; padding: 4px 0;")
         self.chatLayout.insertWidget(self.chatLayout.count()-1, self._typing)
         self._scroll_down()
 

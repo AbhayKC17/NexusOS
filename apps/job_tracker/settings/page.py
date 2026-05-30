@@ -42,7 +42,7 @@ class _OAuthWaitDialog(QDialog):
         )
         info.setWordWrap(True)
         info.setStyleSheet(
-            "color: rgba(255,255,255,0.65); font-size: 13px; background: transparent;"
+            "color: rgba(0,0,0,0.65); font-size: 13px; background: transparent;"
         )
         lay.addWidget(info)
 
@@ -196,7 +196,7 @@ class SettingsPage(QWidget):
             "Sign in once; tokens are refreshed automatically."
         )
         g_note.setWordWrap(True)
-        g_note.setStyleSheet("color: rgba(255,255,255,0.6); font-size: 12px; background: transparent;")
+        g_note.setStyleSheet("color: rgba(0,0,0,0.65); font-size: 12px; background: transparent;")
         gf.addWidget(g_note)
 
         # Dynamic account list
@@ -237,7 +237,7 @@ class SettingsPage(QWidget):
             "and match them to your job applications."
         )
         a_note.setWordWrap(True)
-        a_note.setStyleSheet("color: rgba(255,255,255,0.6); font-size: 12px; background: transparent;")
+        a_note.setStyleSheet("color: rgba(0,0,0,0.65); font-size: 12px; background: transparent;")
         af.addWidget(a_note)
 
         acct_row = QHBoxLayout()
@@ -303,7 +303,7 @@ class SettingsPage(QWidget):
 
         if not accounts:
             lbl = QLabel("  No Google accounts connected yet.")
-            lbl.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px; background: transparent;")
+            lbl.setStyleSheet("color: rgba(0,0,0,0.5); font-size: 12px; background: transparent;")
             lay.addWidget(lbl)
             return
 
@@ -315,7 +315,7 @@ class SettingsPage(QWidget):
 
             row_w = QWidget()
             row_w.setStyleSheet(
-                "background: rgba(255,255,255,0.05); border-radius: 8px;"
+                "background: #FAFAFA; border-radius: 8px;"
             )
             rl = QHBoxLayout(row_w)
             rl.setContentsMargins(12, 8, 12, 8)
@@ -550,7 +550,7 @@ class SettingsPage(QWidget):
         )
         groq_note.setWordWrap(True)
         groq_note.setStyleSheet(
-            "color: rgba(255,255,255,0.45); font-size: 12px; background: transparent;"
+            "color: rgba(0,0,0,0.5); font-size: 12px; background: transparent;"
         )
 
         lay.addRow("Model (.gguf):", mrow)
@@ -571,7 +571,7 @@ class SettingsPage(QWidget):
         )
         note.setWordWrap(True)
         note.setStyleSheet(
-            "color: rgba(255,255,255,0.45); font-size: 12px; background: transparent; padding: 8px 0;"
+            "color: rgba(0,0,0,0.5); font-size: 12px; background: transparent; padding: 8px 0;"
         )
         note.setTextFormat(Qt.TextFormat.RichText)
         lay.addRow("", note)
@@ -690,7 +690,7 @@ links the reply to the right application, and Mistral 7B drafts a response for y
                 self.groqStatusLbl.setStyleSheet("color: #6CCB5F; font-size: 12px; background: transparent;")
             else:
                 self.groqStatusLbl.setText("○  Not configured — AI drafts use local model only")
-                self.groqStatusLbl.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px; background: transparent;")
+                self.groqStatusLbl.setStyleSheet("color: rgba(0,0,0,0.5); font-size: 12px; background: transparent;")
         except Exception:
             pass
 
@@ -739,6 +739,6 @@ links the reply to the right application, and Mistral 7B drafts a response for y
             self.groqStatusLbl.setStyleSheet("color: #6CCB5F; font-size: 12px; background: transparent;")
         else:
             self.groqStatusLbl.setText("○  Not configured — AI drafts use local model only")
-            self.groqStatusLbl.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px; background: transparent;")
+            self.groqStatusLbl.setStyleSheet("color: rgba(0,0,0,0.5); font-size: 12px; background: transparent;")
 
         QMessageBox.information(self, "Saved", "Settings saved.")

@@ -115,7 +115,7 @@ class DashboardPage(QWidget):
         lbl_row.addStretch()
         hint = QLabel("Powered by Mistral 7B")
         hint.setStyleSheet(
-            "color: rgba(255,255,255,0.3); font-size: 11px; background: transparent;"
+            "color: rgba(0,0,0,0.42); font-size: 11px; background: transparent;"
         )
         lbl_row.addWidget(hint)
         sc.addLayout(lbl_row)
@@ -440,13 +440,13 @@ class DashboardPage(QWidget):
 
             name_lbl = QLabel(cat[:40])
             name_lbl.setStyleSheet(
-                "color: rgba(255,255,255,0.85); font-size: 12px; background: transparent;"
+                "color: #1A1A1A; font-size: 12px; background: transparent;"
             )
             rl.addWidget(name_lbl, 1)
 
             cnt_lbl = QLabel(str(cnt))
             cnt_lbl.setStyleSheet(
-                "color: rgba(255,255,255,0.35); font-size: 11px; background: transparent;"
+                "color: rgba(0,0,0,0.42); font-size: 11px; background: transparent;"
             )
             rl.addWidget(cnt_lbl)
 
@@ -499,7 +499,7 @@ class DashboardPage(QWidget):
                 top.addStretch()
                 d_lbl = QLabel((recv or "")[:10])
                 d_lbl.setStyleSheet(
-                    "color: rgba(255,255,255,0.35); font-size: 11px; background: transparent;"
+                    "color: rgba(0,0,0,0.42); font-size: 11px; background: transparent;"
                 )
                 top.addWidget(d_lbl)
                 cl.addLayout(top)

@@ -3,12 +3,19 @@ import os
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'tracker.db')
 
+# Settings cache — avoids hitting SQLite for every get_setting() call
+_settings_cache: dict | None = None
+
 
 def get_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    conn.execute("PRAGMA cache_size = -8000")   # 8 MB page cache
+    conn.execute("PRAGMA temp_store = MEMORY")
     return conn
 
 
@@ -153,14 +160,25 @@ def subject_to_tracking_key(subject: str) -> str:
 
 
 def get_setting(key, default=None):
-    conn = get_db()
-    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
-    conn.close()
-    return row['value'] if row else default
+    global _settings_cache
+    if _settings_cache is None:
+        # Load all settings at once into cache
+        try:
+            conn = get_db()
+            rows = conn.execute("SELECT key, value FROM settings").fetchall()
+            conn.close()
+            _settings_cache = {r["key"]: r["value"] for r in rows}
+        except Exception:
+            _settings_cache = {}
+    return _settings_cache.get(key, default)
 
 
 def set_setting(key, value):
+    global _settings_cache
     conn = get_db()
     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
     conn.commit()
     conn.close()
+    # Invalidate cache so next get_setting() reflects the update
+    if _settings_cache is not None:
+        _settings_cache[key] = value

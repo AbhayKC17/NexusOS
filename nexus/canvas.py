@@ -28,16 +28,18 @@ from PyQt6.QtGui import (
 
 # ── Type → (hex color, icon glyph) ───────────────────────────────────────────
 _TYPE = {
-    "APP":        ("#7C3AED", "⊡"),
-    "FUNCTION":   ("#059669", "ƒ"),
-    "FILE_EXCEL": ("#16A34A", "⊞"),
-    "FILE_PDF":   ("#DC2626", "⊟"),
-    "FILE_TEXT":  ("#0284C7", "≡"),
+    "APP":        ("#0067C0", "⊡"),
+    "FUNCTION":   ("#107C10", "ƒ"),
+    "FILE_EXCEL": ("#217346", "⊞"),
+    "FILE_PDF":   ("#C42B1C", "⊟"),
+    "FILE_TEXT":  ("#0078D4", "≡"),
     "FILE_CODE":  ("#0EA5E9", "<>"),
     "FILE_IMAGE": ("#EA580C", "⊕"),
-    "NOTE":       ("#A78BFA", "✎"),
-    "API":        ("#D97706", "@"),
-    "DATA":       ("#6366F1", "⊡"),
+    "NOTE":       ("#6E4FBE", "✎"),
+    "API":        ("#9D5D00", "@"),
+    "DATA":       ("#0067C0", "⊡"),
+    "DOC":        ("#2B579A", "📄"),
+    "PPT":        ("#D24726", "📊"),
     "DEFAULT":    ("#6B7280", "○"),
 }
 
@@ -312,16 +314,16 @@ class GraphCanvas(QGraphicsView):
         self._selected: NodeItem | None   = None
         self._connect_from: str | None    = None  # node id pending connection
 
-        # Force layout
+        # Force layout — run at 30fps (33ms) instead of 55fps (18ms)
         self._layout_timer = QTimer(self)
         self._layout_timer.timeout.connect(self._layout_step)
         self._iter = 0
 
-        # Pulse animation for selected node
+        # Pulse animation — 50ms is imperceptible from 40ms but uses 20% less CPU
         self._pulse_timer  = QTimer(self)
         self._pulse_phase  = 0.0
         self._pulse_timer.timeout.connect(self._pulse_step)
-        self._pulse_timer.start(40)
+        self._pulse_timer.start(50)
 
         self._setup_view()
 
@@ -478,7 +480,7 @@ class GraphCanvas(QGraphicsView):
     def _restart_layout(self):
         self._iter = 0
         if not self._layout_timer.isActive():
-            self._layout_timer.start(18)
+            self._layout_timer.start(33)
 
     def _layout_step(self):
         nodes = list(self._nodes.values())

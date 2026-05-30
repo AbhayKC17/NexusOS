@@ -39,7 +39,7 @@ class ComposePanel(QWidget):
         lay.setSpacing(10)
 
         hdr = QLabel("✉  New Email")
-        hdr.setStyleSheet("font-size: 15px; font-weight: 700; color: #FFFFFF; background: transparent;")
+        hdr.setStyleSheet("font-size: 15px; font-weight: 700; color: #1A1A1A; background: transparent;")
         lay.addWidget(hdr)
 
         def field(placeholder, text=""):
@@ -68,20 +68,20 @@ class ComposePanel(QWidget):
         opts_row = QHBoxLayout(); opts_row.setSpacing(16)
         self.trackChk  = QCheckBox("Embed TKEY tracking")
         self.trackChk.setChecked(True)
-        self.trackChk.setStyleSheet("color: rgba(255,255,255,0.55); font-size: 12px;")
+        self.trackChk.setStyleSheet("color: rgba(0,0,0,0.55); font-size: 12px;")
         opts_row.addWidget(self.trackChk)
 
         self.resumeChk = QCheckBox("Attach resume")
         resume = get_setting("resume_path", "")
         self.resumeChk.setEnabled(bool(resume))
         self.resumeChk.setChecked(bool(resume))
-        self.resumeChk.setStyleSheet("color: rgba(255,255,255,0.55); font-size: 12px;")
+        self.resumeChk.setStyleSheet("color: rgba(0,0,0,0.55); font-size: 12px;")
         opts_row.addWidget(self.resumeChk)
         opts_row.addStretch()
         lay.addLayout(opts_row)
 
         self.statusLbl = QLabel("")
-        self.statusLbl.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px; background: transparent;")
+        self.statusLbl.setStyleSheet("color: rgba(0,0,0,0.5); font-size: 12px; background: transparent;")
         lay.addWidget(self.statusLbl)
 
         btn_row = QHBoxLayout(); btn_row.setSpacing(8)
@@ -155,26 +155,26 @@ class MessageView(QWidget):
         lay.setSpacing(8)
 
         self.fromLbl    = QLabel("")
-        self.fromLbl.setStyleSheet("font-size: 13px; color: rgba(255,255,255,0.6); background: transparent;")
+        self.fromLbl.setStyleSheet("font-size: 13px; color: rgba(0,0,0,0.65); background: transparent;")
         self.subjectLbl = QLabel("")
-        self.subjectLbl.setStyleSheet("font-size: 15px; font-weight: 700; color: #FFFFFF; background: transparent;")
+        self.subjectLbl.setStyleSheet("font-size: 15px; font-weight: 700; color: #1A1A1A; background: transparent;")
         self.subjectLbl.setWordWrap(True)
         self.dateLbl    = QLabel("")
-        self.dateLbl.setStyleSheet("font-size: 11px; color: rgba(255,255,255,0.35); background: transparent;")
+        self.dateLbl.setStyleSheet("font-size: 11px; color: rgba(0,0,0,0.42); background: transparent;")
 
         lay.addWidget(self.subjectLbl)
         lay.addWidget(self.fromLbl)
         lay.addWidget(self.dateLbl)
 
         sep = QFrame(); sep.setFixedHeight(1)
-        sep.setStyleSheet("background: rgba(255,255,255,0.07);")
+        sep.setStyleSheet("background: #FAFAFA;")
         lay.addWidget(sep)
 
         self.bodyEdit = QTextEdit()
         self.bodyEdit.setReadOnly(True)
         self.bodyEdit.setStyleSheet(
             "background: transparent; border: none; font-size: 13px; "
-            "color: rgba(255,255,255,0.85); line-height: 1.7; padding: 4px;"
+            "color: #1A1A1A; line-height: 1.7; padding: 4px;"
         )
         lay.addWidget(self.bodyEdit, 1)
 
@@ -239,7 +239,7 @@ class MailPage(QWidget):
         tbl.addStretch()
 
         self.accountLbl = QLabel("Not configured")
-        self.accountLbl.setStyleSheet("color: rgba(255,255,255,0.35); font-size: 12px; background: transparent;")
+        self.accountLbl.setStyleSheet("color: rgba(0,0,0,0.42); font-size: 12px; background: transparent;")
         tbl.addWidget(self.accountLbl)
 
         refresh_btn = QPushButton("↻  Refresh")
@@ -275,7 +275,7 @@ class MailPage(QWidget):
         self.statusLbl = QLabel("")
         self.statusLbl.setWordWrap(True)
         self.statusLbl.setStyleSheet(
-            "color: rgba(255,255,255,0.3); font-size: 10px; background: transparent; padding: 8px;"
+            "color: rgba(0,0,0,0.42); font-size: 10px; background: transparent; padding: 8px;"
         )
         ll.addWidget(self.statusLbl)
         splitter.addWidget(left)
@@ -290,7 +290,7 @@ class MailPage(QWidget):
             "QListWidget { background: transparent; border: none; outline: none; }"
             "QListWidget::item { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.05); }"
             "QListWidget::item:selected { background: rgba(0,120,212,0.25); }"
-            "QListWidget::item:hover { background: rgba(255,255,255,0.04); }"
+            "QListWidget::item:hover { background: #FAFAFA; }"
         )
         self.msgList.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.msgList.currentRowChanged.connect(self._on_message_selected)
@@ -299,7 +299,7 @@ class MailPage(QWidget):
         self.loadingLbl = QLabel("Select a folder to load messages.")
         self.loadingLbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.loadingLbl.setStyleSheet(
-            "color: rgba(255,255,255,0.3); font-size: 13px; background: transparent; padding: 30px;"
+            "color: rgba(0,0,0,0.42); font-size: 13px; background: transparent; padding: 30px;"
         )
         cl.addWidget(self.loadingLbl)
         splitter.addWidget(centre)
@@ -326,9 +326,9 @@ class MailPage(QWidget):
         btn.setFlat(True)
         btn.setFixedHeight(36)
         btn.setStyleSheet(
-            "QPushButton { color: rgba(255,255,255,0.6); text-align: left; "
+            "QPushButton { color: rgba(0,0,0,0.65); text-align: left; "
             "padding: 0 12px; border: none; font-size: 13px; background: transparent; }"
-            "QPushButton:hover { background: rgba(255,255,255,0.05); color: #FFFFFF; }"
+            "QPushButton:hover { background: #FAFAFA; color: #FFFFFF; }"
             "QPushButton:pressed { background: rgba(0,120,212,0.2); }"
         )
         btn.clicked.connect(lambda: self._load_folder(folder))

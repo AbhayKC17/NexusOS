@@ -62,26 +62,26 @@ class DraftCard(QFrame):
         top.addSpacing(8)
 
         company_lbl = QLabel(f"<b>{d.get('company') or d.get('from_email', '—')}</b>")
-        company_lbl.setStyleSheet("font-size: 14px; color: #FFFFFF; background: transparent;")
+        company_lbl.setStyleSheet("font-size: 14px; color: #1A1A1A; background: transparent;")
         top.addWidget(company_lbl)
         top.addStretch()
 
         dt = QLabel((d.get("received_at") or "")[:10])
-        dt.setStyleSheet("color: rgba(255,255,255,0.35); font-size: 11px; background: transparent;")
+        dt.setStyleSheet("color: rgba(0,0,0,0.38); font-size: 11px; background: transparent;")
         top.addWidget(dt)
         lay.addLayout(top)
 
         if d.get("position"):
             pos = QLabel(d["position"])
-            pos.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px; background: transparent;")
+            pos.setStyleSheet("color: rgba(0,0,0,0.5); font-size: 12px; background: transparent;")
             lay.addWidget(pos)
 
         from_lbl = QLabel(f"From: {d.get('from_email', '—')}")
-        from_lbl.setStyleSheet("color: rgba(255,255,255,0.35); font-size: 11px; background: transparent;")
+        from_lbl.setStyleSheet("color: rgba(0,0,0,0.38); font-size: 11px; background: transparent;")
         lay.addWidget(from_lbl)
 
         subj_lbl = QLabel(f"Subject: {d.get('subject', '—')}")
-        subj_lbl.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px; background: transparent;")
+        subj_lbl.setStyleSheet("color: rgba(0,0,0,0.5); font-size: 12px; background: transparent;")
         lay.addWidget(subj_lbl)
 
         # ── Original reply body (collapsible) ─────────────────────────────────
@@ -96,8 +96,9 @@ class DraftCard(QFrame):
         orig_view.setMaximumHeight(160)
         orig_view.setVisible(False)
         orig_view.setStyleSheet(
-            "background: #1C1C1C; border: 1px solid rgba(255,255,255,0.08); "
-            "border-radius: 6px; font-size: 12px; font-family: 'Courier New', monospace; padding: 8px;"
+            "background: #F8F8F8; border: 1px solid rgba(0,0,0,0.10); "
+            "border-radius: 6px; font-size: 12px; font-family: 'Courier New', monospace; "
+            "padding: 8px; color: #1A1A1A;"
         )
         lay.addWidget(orig_view)
 
@@ -114,7 +115,7 @@ class DraftCard(QFrame):
             else "⚡  Click 'Generate with AI' to create a reply draft"
         )
         self.draftLabel.setStyleSheet(
-            f"color: {'#00C864' if has_draft else '#FCE100'}; "
+            f"color: {'#107C10' if has_draft else '#9D5D00'}; "
             "font-size: 11px; font-weight: 700; background: transparent;"
         )
         draft_hdr.addWidget(self.draftLabel)
@@ -132,8 +133,8 @@ class DraftCard(QFrame):
         self.draftEdit.setMinimumHeight(160)
         self.draftEdit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.draftEdit.setStyleSheet(
-            "background: #1A2A1A; border: 1px solid rgba(0,200,100,0.3); "
-            "border-radius: 6px; font-size: 13px; color: #E8FFE8; padding: 10px;"
+            "background: #F0FFF4; border: 1px solid rgba(16,124,16,0.25); "
+            "border-radius: 6px; font-size: 13px; color: #1A1A1A; padding: 10px;"
         )
         if not has_draft:
             self.draftEdit.setPlaceholderText(
@@ -185,7 +186,7 @@ class DraftCard(QFrame):
         self.regenBtn.setText("↻  Regenerate")
         self.draftEdit.setPlainText(draft)
         self.draftLabel.setText("✦  AI Reply Draft  (edit before sending)")
-        self.draftLabel.setStyleSheet("color: #00C864; font-size: 11px; font-weight: 700; background: transparent;")
+        self.draftLabel.setStyleSheet("color: #107C10; font-size: 11px; font-weight: 700; background: transparent;")
 
     def _on_regen_error(self, row_id: int, msg: str):
         self.regenBtn.setEnabled(True)
@@ -226,41 +227,41 @@ class ReplyCard(QFrame):
 
         top = QHBoxLayout()
         co = QLabel(f"<b>{d.get('company') or d.get('from_email', '—')}</b>")
-        co.setStyleSheet("font-size: 14px; color: #FFFFFF; background: transparent;")
+        co.setStyleSheet("font-size: 14px; color: #1A1A1A; background: transparent;")
         top.addWidget(co); top.addStretch()
         dt = QLabel((d.get("received_at") or "")[:10])
-        dt.setStyleSheet("color: rgba(255,255,255,0.35); font-size: 11px; background: transparent;")
+        dt.setStyleSheet("color: rgba(0,0,0,0.38); font-size: 11px; background: transparent;")
         top.addWidget(dt)
         lay.addLayout(top)
 
         pos = QLabel(d.get("position") or "")
-        pos.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px; background: transparent;")
+        pos.setStyleSheet("color: rgba(0,0,0,0.5); font-size: 12px; background: transparent;")
         lay.addWidget(pos)
 
         subj = QLabel(f"Subject: {d.get('subject') or '—'}")
-        subj.setStyleSheet("color: rgba(255,255,255,0.4); font-size: 12px; background: transparent;")
+        subj.setStyleSheet("color: rgba(0,0,0,0.5); font-size: 12px; background: transparent;")
         lay.addWidget(subj)
 
         from_lbl = QLabel(f"From: {d.get('from_email') or '—'}")
-        from_lbl.setStyleSheet("color: rgba(255,255,255,0.35); font-size: 11px; background: transparent;")
+        from_lbl.setStyleSheet("color: rgba(0,0,0,0.38); font-size: 11px; background: transparent;")
         lay.addWidget(from_lbl)
 
         if d.get("summary"):
             ai_frame = QFrame()
             ai_frame.setStyleSheet(
-                "QFrame { background: rgba(0,120,212,0.1); "
-                "border: 1px solid rgba(0,120,212,0.25); border-radius: 6px; }"
+                "QFrame { background: rgba(0,103,192,0.06); "
+                "border: 1px solid rgba(0,103,192,0.18); border-radius: 6px; }"
             )
             ai_l = QVBoxLayout(ai_frame)
             ai_l.setContentsMargins(12, 10, 12, 10)
             ai_l.setSpacing(4)
             ai_tag = QLabel("✦  AI Summary")
-            ai_tag.setStyleSheet("color: #60CDFF; font-size: 11px; font-weight: 700; background: transparent;")
+            ai_tag.setStyleSheet("color: #0067C0; font-size: 11px; font-weight: 700; background: transparent;")
             ai_l.addWidget(ai_tag)
             ai_txt = QLabel(d["summary"])
             ai_txt.setWordWrap(True)
             ai_txt.setStyleSheet(
-                "color: rgba(255,255,255,0.85); font-size: 13px; line-height: 1.5; background: transparent;"
+                "color: #1A1A1A; font-size: 13px; line-height: 1.5; background: transparent;"
             )
             ai_l.addWidget(ai_txt)
             lay.addWidget(ai_frame)
@@ -276,8 +277,9 @@ class ReplyCard(QFrame):
         body_view.setMaximumHeight(200)
         body_view.setVisible(False)
         body_view.setStyleSheet(
-            "background: #1C1C1C; border: 1px solid rgba(255,255,255,0.08); "
-            "border-radius: 6px; font-size: 12px; font-family: 'Courier New', monospace; padding: 8px;"
+            "background: #F8F8F8; border: 1px solid rgba(0,0,0,0.10); "
+            "border-radius: 6px; font-size: 12px; font-family: 'Courier New', monospace; "
+            "padding: 8px; color: #1A1A1A;"
         )
         lay.addWidget(body_view)
 
@@ -294,7 +296,7 @@ class _SectionHeader(QLabel):
     def __init__(self, text: str, parent=None):
         super().__init__(text, parent)
         self.setStyleSheet(
-            "color: rgba(255,255,255,0.5); font-size: 11px; font-weight: 700; "
+            "color: rgba(0,0,0,0.42); font-size: 11px; font-weight: 700; "
             "letter-spacing: 1px; background: transparent; padding: 4px 0px;"
         )
 
@@ -471,7 +473,7 @@ class RepliesPage(QWidget):
                 "• Click  ↻ Sync Replies  to check for [TRK-UUID] tracking replies.\n\n"
                 "Make sure Apple Mail or Outlook sync mode is configured in Settings."
             )
-            empty.setStyleSheet("color: rgba(255,255,255,0.35); background: transparent;")
+            empty.setStyleSheet("color: rgba(0,0,0,0.38); background: transparent;")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             empty.setWordWrap(True)
             self.listLayout.insertWidget(0, empty)
