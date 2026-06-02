@@ -390,6 +390,7 @@ class ApplicationDialog(QDialog):
 
 class ApplicationsPage(QWidget):
     compose_requested = pyqtSignal(int)
+    data_changed      = pyqtSignal()   # emitted after delete so other tabs can refresh
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -610,6 +611,7 @@ class ApplicationsPage(QWidget):
         conn.commit()
         conn.close()
         self.refresh()
+        self.data_changed.emit()
 
     def _import(self):
         path, _ = QFileDialog.getOpenFileName(

@@ -608,6 +608,7 @@ class CampaignPage(QWidget):
     def refresh(self):
         if hasattr(self, "_ai_tab"):
             self._ai_tab.refresh()
+        self._reload_table_full()
         self._reload_sender_combo()
 
         # AI badge

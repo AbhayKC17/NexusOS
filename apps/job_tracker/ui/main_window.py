@@ -211,6 +211,8 @@ class MainWindow(QMainWindow):
             self.stack.addWidget(p)
 
         self.appsPage.compose_requested.connect(self._compose)
+        self.dataPage.data_changed.connect(self.campPage.refresh)
+        self.appsPage.data_changed.connect(self.campPage.refresh)
         root.addWidget(self.stack, 1)
 
         # Status bar

@@ -51,6 +51,13 @@ def process_excel(filepath, filename):
     conn = get_db()
     for idx, row in df.iterrows():
         try:
+            def get_col(field):
+                mapped = col_map.get(field)
+                if mapped and mapped in df.columns:
+                    val = row.get(mapped)
+                    return str(val).strip() if pd.notna(val) else None
+                return None
+
             # Resolve UUID
             if 'uuid' in col_map and pd.notna(row.get(col_map['uuid'], None)):
                 row_uuid = str(row[col_map['uuid']]).strip()
@@ -77,13 +84,6 @@ def process_excel(filepath, filename):
                 if dup_by_match:
                     results['duplicates_skipped'] += 1
                     continue
-
-            def get_col(field):
-                mapped = col_map.get(field)
-                if mapped and mapped in df.columns:
-                    val = row.get(mapped)
-                    return str(val).strip() if pd.notna(val) else None
-                return None
 
             # Store ALL columns as raw JSON for the spreadsheet view
             raw = {}

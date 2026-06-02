@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QMessageBox, QMenu, QFileDialog, QApplication,
     QProgressBar, QComboBox,
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon
 
 from database import get_db, get_setting, set_setting
@@ -53,6 +53,8 @@ _DISPLAY = {
 
 
 class SpreadsheetPage(QWidget):
+    data_changed = pyqtSignal()   # emitted after any delete/clear so other tabs can refresh
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._app_ids: list[int]       = []
@@ -589,6 +591,7 @@ class SpreadsheetPage(QWidget):
             self, "Done", f"Removed {len(to_delete)} duplicate entries."
         )
         self._reload()
+        self.data_changed.emit()
 
     # ── Export ────────────────────────────────────────────────────────────────
 
@@ -666,4 +669,5 @@ class SpreadsheetPage(QWidget):
         conn.commit()
         conn.close()
         self._reload()
+        self.data_changed.emit()
         QMessageBox.information(self, "Cleared", "All data has been deleted.")

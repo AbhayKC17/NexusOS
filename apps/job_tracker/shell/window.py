@@ -262,6 +262,8 @@ class MainWindow(QMainWindow):
 
         # Wire cross-page signals
         self._apps.compose_requested.connect(self._open_compose)
+        self._data.data_changed.connect(self._camp.refresh)
+        self._apps.data_changed.connect(self._camp.refresh)
 
         root.addWidget(self._stack, 1)
 
