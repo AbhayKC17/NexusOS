@@ -18,6 +18,7 @@ from modules.apple_mail_sender import (
     generate_personalized_intro,
     build_email_body,
     transform_to_careers,
+    generate_subject,
 )
 
 
@@ -110,7 +111,7 @@ def quick_send_email(
         short_desc=hint[:400] if hint else "",
     )
     body    = build_email_body(company_name, intro)
-    subject = f"Joining {company_name}'s journey — {p['name']}"
+    subject = generate_subject(company_name, "", p["name"], p.get("role", ""))
     tkey    = subject_to_tracking_key(subject)
 
     # ── build recipient list ───────────────────────────────────────────────────

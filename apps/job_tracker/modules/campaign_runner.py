@@ -162,11 +162,9 @@ def _run_thread(run_id: int, stop_evt: threading.Event) -> None:
             position = (app["position"] or "").strip()
             intro    = generate_personalized_intro(company_name=company,
                                                    short_desc=app["notes"] or "")
-            subject  = (
-                f"Exploring {position} opportunities at {company or 'your company'}"
-                if position else
-                f"Joining {company or 'your company'}'s journey — {p['name']}"
-            )
+            from modules.apple_mail_sender import generate_subject
+            subject  = generate_subject(company or "your company", position,
+                                        p["name"], p.get("role", ""))
             body = build_email_body(company, intro, position)
             tkey = _tkey(subject)
 

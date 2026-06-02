@@ -7,7 +7,7 @@ Uses the local LLM when loaded; falls back to the template path otherwise.
 import re
 from typing import Dict, List
 
-from modules.apple_mail_sender import _profile, generate_personalized_intro, build_email_body
+from modules.apple_mail_sender import _profile, generate_personalized_intro, build_email_body, generate_subject
 
 
 def _company_from_email(email: str) -> str:
@@ -103,7 +103,7 @@ def generate_email_for_contact(
         short_desc=instructions[:300] if instructions else "",
     )
     body = build_email_body(company, intro)
-    subject = f"Joining {company}'s journey — {p['name']}"
+    subject = generate_subject(company, "", p["name"], p.get("role", ""))
     return {"email": to_email, "company": company, "subject": subject, "body": body}
 
 

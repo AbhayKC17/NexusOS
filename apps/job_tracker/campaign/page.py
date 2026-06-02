@@ -945,10 +945,9 @@ class CampaignPage(QWidget):
         resume  = get_setting("resume_path", "")
         sname   = get_setting("sender_name", "")
 
-        subject = (
-            f"Exploring {pos} opportunities at {company}" if pos
-            else f"Joining {company}'s journey — {sname}"
-        )
+        from modules.apple_mail_sender import generate_subject
+        srole   = get_setting("sender_role", "")
+        subject = generate_subject(company, pos, sname, srole)
 
         self.previewEdit.setPlainText("⟳  Generating…")
         self.previewBtn.setEnabled(False)

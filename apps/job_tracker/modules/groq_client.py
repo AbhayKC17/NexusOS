@@ -305,7 +305,8 @@ def draft_single_email(
                 body = body.rstrip() + f"\n\n{signoff}"
 
             if not subject:
-                subject = f"Exploring opportunities at {company} — {name}"
+                from modules.apple_mail_sender import generate_subject
+                subject = generate_subject(company, "", name, role)
 
             # Sanity check: body must mention the company name, not just the sender's
             if company.split()[0].lower() in body.lower():
@@ -349,8 +350,11 @@ def draft_single_email(
                         body = f"{greeting}\n\n{body}"
                     if "Best regards" not in body:
                         body = body.rstrip() + f"\n\n{signoff}"
+                    if not d.get("subject"):
+                        from modules.apple_mail_sender import generate_subject
+                        d["subject"] = generate_subject(company, "", name, role)
                     return {"email": email, "company": company,
-                            "subject": d.get("subject", f"Exploring opportunities — {name}"),
+                            "subject": d["subject"],
                             "body":    body}
                 break
             except ValueError as err:
@@ -367,10 +371,11 @@ def draft_single_email(
         f"I came across {company} and your work aligns strongly with my "
         f"background in {pitch or 'product and operations'}."
     )
+    from modules.apple_mail_sender import generate_subject
     return {
         "email":   email,
         "company": company,
-        "subject": f"Exploring opportunities at {company} — {name}",
+        "subject": generate_subject(company, "", name, role),
         "body":    build_email_body(company, intro),
     }
 

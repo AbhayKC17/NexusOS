@@ -3,6 +3,7 @@ Apple Mail bulk sender using AppleScript + local LLM for personalised intros.
 Emails are sent as HTML with an invisible tracking key embedded.
 """
 
+import hashlib as _hashlib
 import html as _html_mod
 import os
 import subprocess
@@ -13,6 +14,45 @@ from typing import Optional, List
 import pandas as pd
 
 from database import get_db, get_setting, subject_to_tracking_key as _subject_to_key
+
+
+# ── Subject line pools ────────────────────────────────────────────────────────
+# A hash of the company name picks a template, so the same company always gets
+# the same subject while different companies get visibly different subjects.
+
+_SUBJ_WITH_POS = [
+    "{position} Application — {name}",
+    "Interest in {position} Role at {company}",
+    "Applying for {position} | {company}",
+    "Re: {position} at {company} — {name}",
+    "Prospective {position} — {company}",
+    "{position} Opportunity — {name}",
+    "{company} × {name}: {position}",
+    "{position} Interest | {name} ({role})",
+]
+
+_SUBJ_NO_POS = [
+    "Engineering Talent Inquiry — {company}",
+    "Quick Introduction: {name}, {role}",
+    "Prospective {role} at {company}",
+    "Software Engineer Outreach — {company}",
+    "Open Application | {company} — {name}",
+    "{role} Interest — {company}",
+    "Introduction: {name} × {company}",
+    "Reaching Out — {role} for {company}",
+]
+
+
+def generate_subject(company: str, position: str = "",
+                     sender_name: str = "", sender_role: str = "") -> str:
+    idx = int(_hashlib.md5((company or "").lower().encode()).hexdigest(), 16)
+    role = sender_role or "Software Engineer"
+    if position:
+        tpl = _SUBJ_WITH_POS[idx % len(_SUBJ_WITH_POS)]
+        return tpl.format(company=company, position=position,
+                          name=sender_name, role=role)
+    tpl = _SUBJ_NO_POS[idx % len(_SUBJ_NO_POS)]
+    return tpl.format(company=company, name=sender_name, role=role)
 
 
 def _profile():
@@ -356,10 +396,8 @@ def run_bulk_campaign(
                 funding=str(raw.get("total_funding_usd") or ""),
                 employees=str(raw.get("num_employees") or ""),
             )
-            if position:
-                subject = f"Exploring {position} opportunities at {company or 'your company'}"
-            else:
-                subject = f"Joining {company or 'your company'}'s journey — {p['name']}"
+            subject = generate_subject(company or "your company", position,
+                                       p["name"], p["role"])
             body    = build_email_body(company, intro, position)
 
             tracking_key = _subject_to_key(subject)

@@ -130,17 +130,16 @@ class ComposeDialog(QDialog):
         if ls._get_llm() is None:
             QMessageBox.warning(self, "LLM", "Load the model in Settings first.")
             return
-        from modules.apple_mail_sender import generate_personalized_intro, build_email_body
-        intro = generate_personalized_intro(
-            self._app.get("company", ""), self._app.get("notes", "")
-        )
-        self.bodyField.setPlainText(
-            build_email_body(self._app.get("company", ""), intro)
-        )
-        self.subjField.setText(
-            f"Exploring {self._app.get('position', 'product')} opportunities "
-            f"at {self._app.get('company', 'your company')}"
-        )
+        from modules.apple_mail_sender import generate_personalized_intro, build_email_body, generate_subject
+        from database import get_setting
+        company = self._app.get("company", "your company")
+        pos     = self._app.get("position", "")
+        intro = generate_personalized_intro(company, self._app.get("notes", ""))
+        self.bodyField.setPlainText(build_email_body(company, intro))
+        self.subjField.setText(generate_subject(
+            company, pos,
+            get_setting("sender_name", ""), get_setting("sender_role", ""),
+        ))
 
     def _send_apple(self):
         if not self.subjField.text().strip() or not self.bodyField.toPlainText().strip():
