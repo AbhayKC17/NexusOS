@@ -9,8 +9,8 @@ import subprocess
 
 from docx import Document
 
-# Groq API key — loaded from DB settings first, falls back to this default.
-_GROQ_API_KEY  = "REMOVED_SECRET"
+# Groq API key — loaded from DB settings at runtime; set it in Settings → API Keys.
+_GROQ_API_KEY  = ""
 _GROQ_MODEL    = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 MASTER_PROMPT = """💼 ELITE RESUME STRATEGIST — MASTER PROMPT
