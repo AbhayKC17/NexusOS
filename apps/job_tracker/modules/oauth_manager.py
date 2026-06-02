@@ -32,9 +32,11 @@ import requests
 from database import get_setting, set_setting
 
 # ── Bundled app credentials ───────────────────────────────────────────────────
-# Registered once — users never need to enter these.
-_GOOGLE_CLIENT_ID     = "REMOVED_SECRET"
-_GOOGLE_CLIENT_SECRET = "REMOVED_SECRET"
+# Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET as environment variables, or
+# configure them via Settings in the app. Register your own at
+# https://console.cloud.google.com/apis/credentials
+_GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", get_setting("google_client_id", ""))
+_GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", get_setting("google_client_secret", ""))
 
 # ── Redirect server ───────────────────────────────────────────────────────────
 
