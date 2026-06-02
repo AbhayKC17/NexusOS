@@ -97,11 +97,7 @@ class DashboardPage(QWidget):
 
         # ── Graph RAG search bar ───────────────────────────────────────────────
         search_card = QFrame()
-        search_card.setObjectName("cardElevated")
-        search_card.setStyleSheet(
-            "QFrame#cardElevated { background: rgba(0,120,212,0.07); "
-            "border: 1px solid rgba(0,120,212,0.28); border-radius: 10px; }"
-        )
+        search_card.setObjectName("aiCard")
         sc = QVBoxLayout(search_card)
         sc.setContentsMargins(16, 12, 16, 12)
         sc.setSpacing(8)
@@ -109,13 +105,13 @@ class DashboardPage(QWidget):
         lbl_row = QHBoxLayout()
         ai_lbl = QLabel("✦  Graph RAG  ·  Ask anything about your companies")
         ai_lbl.setStyleSheet(
-            "color: #60CDFF; font-size: 12px; font-weight: 600; background: transparent;"
+            "color: #0067C0; font-size: 12px; font-weight: 600; background: transparent;"
         )
         lbl_row.addWidget(ai_lbl)
         lbl_row.addStretch()
         hint = QLabel("Powered by Mistral 7B")
         hint.setStyleSheet(
-            "color: rgba(0,0,0,0.42); font-size: 11px; background: transparent;"
+            "color: rgba(0,0,0,0.35); font-size: 11px; background: transparent;"
         )
         lbl_row.addWidget(hint)
         sc.addLayout(lbl_row)
@@ -149,7 +145,7 @@ class DashboardPage(QWidget):
         self.aiResult.setWordWrap(True)
         self.aiResult.setVisible(False)
         self.aiResult.setStyleSheet(
-            "color: #FFFFFF; font-size: 13px; background: transparent; padding: 4px 0;"
+            "color: #1A1A1A; font-size: 13px; background: transparent; padding: 4px 0;"
         )
         sc.addWidget(self.aiResult)
         root.addWidget(search_card)
@@ -176,7 +172,7 @@ class DashboardPage(QWidget):
 
         lc_hdr = QWidget()
         lc_hdr.setStyleSheet(
-            "background: transparent; border-bottom: 1px solid rgba(255,255,255,0.06);"
+            "background: transparent; border-bottom: 1px solid rgba(0,0,0,0.06);"
         )
         lc_hdr_lay = QHBoxLayout(lc_hdr)
         lc_hdr_lay.setContentsMargins(16, 11, 16, 11)
@@ -230,7 +226,7 @@ class DashboardPage(QWidget):
 
         rc_hdr = QWidget()
         rc_hdr.setStyleSheet(
-            "background: transparent; border-bottom: 1px solid rgba(255,255,255,0.06);"
+            "background: transparent; border-bottom: 1px solid rgba(0,0,0,0.06);"
         )
         rc_hdr_lay = QHBoxLayout(rc_hdr)
         rc_hdr_lay.setContentsMargins(16, 11, 16, 11)
@@ -410,9 +406,9 @@ class DashboardPage(QWidget):
                 pass
 
         for country, cnt in sorted(country_counts.items(), key=lambda x: -x[1])[:3]:
-            chip = QLabel(f"🌍 {country}  {cnt}")
+            chip = QLabel(f"  {country}  {cnt}  ")
             chip.setStyleSheet(
-                "color: #60CDFF; background: rgba(0,120,212,0.12); border-radius: 10px; "
+                "color: #0067C0; background: rgba(0,103,192,0.08); border-radius: 10px; "
                 "padding: 3px 10px; font-size: 11px; font-weight: 600;"
             )
             self._insights_row.addWidget(chip)
@@ -434,7 +430,7 @@ class DashboardPage(QWidget):
 
             dot = QLabel("●")
             dot.setStyleSheet(
-                "color: #0078D4; font-size: 8px; background: transparent;"
+                "color: #0067C0; font-size: 8px; background: transparent;"
             )
             rl.addWidget(dot)
 
@@ -446,7 +442,7 @@ class DashboardPage(QWidget):
 
             cnt_lbl = QLabel(str(cnt))
             cnt_lbl.setStyleSheet(
-                "color: rgba(0,0,0,0.42); font-size: 11px; background: transparent;"
+                "color: rgba(0,0,0,0.40); font-size: 11px; background: transparent;"
             )
             rl.addWidget(cnt_lbl)
 
@@ -455,7 +451,7 @@ class DashboardPage(QWidget):
             bar.setFixedHeight(3)
             bar.setMaximumWidth(pct * 2)
             bar.setStyleSheet(
-                "background: rgba(0,120,212,0.5); border-radius: 2px;"
+                "background: rgba(0,103,192,0.40); border-radius: 2px;"
             )
             rl.addWidget(bar)
             self._graph_nodes_lay.addWidget(row_w)
@@ -476,30 +472,26 @@ class DashboardPage(QWidget):
         conn2.close()
 
         if not recent:
-            lbl = EmptyState("No replies yet — send emails and sync to see AI summaries.")
+            lbl = EmptyState("No replies yet — send emails and sync to see AI summaries.", "✉")
             self.repliesLayout.insertWidget(0, lbl)
         else:
             for summary, recv, company, position in recent:
                 card = QFrame()
-                card.setObjectName("cardElevated")
-                card.setStyleSheet(
-                    "QFrame#cardElevated { background: #252530; border-radius: 8px; "
-                    "border: 1px solid rgba(255,255,255,0.07); }"
-                )
+                card.setObjectName("cardRaised")
                 cl = QVBoxLayout(card)
-                cl.setContentsMargins(12, 10, 12, 10)
-                cl.setSpacing(4)
+                cl.setContentsMargins(14, 11, 14, 11)
+                cl.setSpacing(5)
 
                 top = QHBoxLayout()
                 co_lbl = QLabel(f"<b>{company or '—'}</b>")
                 co_lbl.setStyleSheet(
-                    "color: #FFFFFF; font-size: 13px; background: transparent;"
+                    "color: #1A1A1A; font-size: 13px; background: transparent;"
                 )
                 top.addWidget(co_lbl)
                 top.addStretch()
                 d_lbl = QLabel((recv or "")[:10])
                 d_lbl.setStyleSheet(
-                    "color: rgba(0,0,0,0.42); font-size: 11px; background: transparent;"
+                    "color: rgba(0,0,0,0.38); font-size: 11px; background: transparent;"
                 )
                 top.addWidget(d_lbl)
                 cl.addLayout(top)
@@ -508,7 +500,7 @@ class DashboardPage(QWidget):
                     s_lbl = QLabel(summary[:140] + ("…" if len(summary) > 140 else ""))
                     s_lbl.setWordWrap(True)
                     s_lbl.setStyleSheet(
-                        "color: #60CDFF; font-size: 12px; background: transparent;"
+                        "color: #0067C0; font-size: 12px; background: transparent;"
                     )
                     cl.addWidget(s_lbl)
 
@@ -525,7 +517,7 @@ class DashboardPage(QWidget):
 
         self.aiResult.setText("⟳  Searching with Mistral 7B…")
         self.aiResult.setStyleSheet(
-            "color: #FCE100; font-size: 13px; background: transparent; padding: 4px 0;"
+            "color: #0067C0; font-size: 13px; background: transparent; padding: 4px 0;"
         )
         self.aiResult.setVisible(True)
         self.aiClearBtn.setVisible(True)
@@ -573,13 +565,13 @@ class DashboardPage(QWidget):
     def _on_search_result(self, text: str):
         self.aiResult.setText(text)
         self.aiResult.setStyleSheet(
-            "color: #FFFFFF; font-size: 13px; background: transparent; padding: 4px 0;"
+            "color: #1A1A1A; font-size: 13px; background: transparent; padding: 4px 0;"
         )
 
     def _on_search_error(self, err: str):
         self.aiResult.setText(f"⚠  {err}")
         self.aiResult.setStyleSheet(
-            "color: #FCE100; font-size: 12px; background: transparent; padding: 4px 0;"
+            "color: #9D5D00; font-size: 12px; background: transparent; padding: 4px 0;"
         )
 
     def _clear_search(self):

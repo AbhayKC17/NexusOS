@@ -22,7 +22,7 @@ MainWindow instantiates them once and never recreates them.
 import os
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QLabel, QPushButton, QStackedWidget, QFrame,
+    QLabel, QPushButton, QFrame,
     QScrollArea, QStatusBar, QSizePolicy,
 )
 from PyQt6.QtCore import Qt, QTimer
@@ -31,6 +31,7 @@ from PyQt6.QtGui import QFont
 from database import get_setting, set_setting
 from ui.workers import LLMLoaderWorker, EmailSyncWorker
 import modules.llm_summarizer as ls
+from core.widgets import FadeStackedWidget
 
 # Feature pages — one import per module folder
 from dashboard      import DashboardPage
@@ -224,7 +225,7 @@ class MainWindow(QMainWindow):
 
         self._build()
         self._setup_sync_timer()
-        self._navigate(0)
+        self._navigate(0, instant=True)
         QTimer.singleShot(400, self._auto_load_model)
 
     # ── Build ─────────────────────────────────────────────────────────────────
@@ -241,8 +242,8 @@ class MainWindow(QMainWindow):
         self._sidebar = Sidebar(nav_callback=self._navigate)
         root.addWidget(self._sidebar)
 
-        # Page stack — each tab has exactly one persistent widget
-        self._stack = QStackedWidget()
+        # Page stack — smooth fade between pages
+        self._stack = FadeStackedWidget(duration=160)
 
         self._dash   = DashboardPage()
         self._apps   = ApplicationsPage()
@@ -281,9 +282,12 @@ class MainWindow(QMainWindow):
 
     # ── Navigation ────────────────────────────────────────────────────────────
 
-    def _navigate(self, idx: int):
+    def _navigate(self, idx: int, instant: bool = False):
         self._sidebar.set_active(idx)
-        self._stack.setCurrentIndex(idx)
+        if instant:
+            self._stack.setCurrentIndexInstant(idx)
+        else:
+            self._stack.setCurrentIndex(idx)
         page = self._stack.currentWidget()
         if hasattr(page, "refresh"):
             page.refresh()

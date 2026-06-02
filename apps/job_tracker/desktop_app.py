@@ -16,38 +16,53 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QPixmap, QPainter, QColor, QLinearGradient
 
 from database import init_db, get_setting, set_setting
-from core.theme import FLUENT_DARK
+from core.theme import FLUENT_LIGHT
 from shell.window import MainWindow
 
 
 def _build_splash() -> QSplashScreen:
-    W, H = 600, 300
+    W, H = 560, 280
     px = QPixmap(W, H)
-    px.fill(QColor("#0D0D10"))
+    px.fill(QColor("#FFFFFF"))
 
     p = QPainter(px)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+    # Subtle blue gradient wash
     grad = QLinearGradient(0, 0, W, H)
-    grad.setColorAt(0.0, QColor(99, 102, 241, 30))
-    grad.setColorAt(0.5, QColor(99, 102, 241, 10))
-    grad.setColorAt(1.0, QColor(13, 13, 16, 0))
+    grad.setColorAt(0.0, QColor(0, 103, 192, 14))
+    grad.setColorAt(1.0, QColor(0, 103, 192, 4))
     p.fillRect(0, 0, W, H, grad)
 
-    p.setPen(QColor("#818CF8"))
-    p.setFont(QFont("Helvetica Neue", 38, QFont.Weight.Bold))
-    p.drawText(0, 70, W, 60, Qt.AlignmentFlag.AlignCenter, "✦  JobTracker")
+    # App icon circle
+    p.setBrush(QColor(0, 103, 192))
+    p.setPen(Qt.PenStyle.NoPen)
+    cx = W // 2
+    p.drawRoundedRect(cx - 30, 48, 60, 60, 14, 14)
 
-    p.setPen(QColor(239, 239, 239, 120))
+    p.setPen(QColor("#FFFFFF"))
+    p.setFont(QFont("Helvetica Neue", 22, QFont.Weight.Bold))
+    p.drawText(cx - 30, 48, 60, 60, Qt.AlignmentFlag.AlignCenter, "JT")
+
+    # Title
+    p.setPen(QColor("#1A1A1A"))
+    p.setFont(QFont("Helvetica Neue", 26, QFont.Weight.Bold))
+    p.drawText(0, 128, W, 40, Qt.AlignmentFlag.AlignCenter, "JobTracker")
+
+    # Subtitle
+    p.setPen(QColor(0, 0, 0, 110))
     p.setFont(QFont("Helvetica Neue", 13))
-    p.drawText(0, 142, W, 30, Qt.AlignmentFlag.AlignCenter, "AI Job Application Assistant")
+    p.drawText(0, 172, W, 28, Qt.AlignmentFlag.AlignCenter, "AI Job Application Assistant")
 
-    p.setPen(QColor(239, 239, 239, 55))
+    # Loading text
+    p.setPen(QColor(0, 0, 0, 70))
     p.setFont(QFont("Helvetica Neue", 11))
-    p.drawText(0, 192, W, 28, Qt.AlignmentFlag.AlignCenter, "Initialising — loading Mistral 7B…")
+    p.drawText(0, 210, W, 24, Qt.AlignmentFlag.AlignCenter, "Loading…")
 
-    p.setPen(QColor(99, 102, 241, 70))
-    p.drawLine(W // 2 - 70, H - 20, W // 2 + 70, H - 20)
+    # Bottom accent bar
+    p.setBrush(QColor(0, 103, 192, 60))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.drawRect(W // 2 - 40, H - 8, 80, 3)
     p.end()
 
     return QSplashScreen(px, Qt.WindowType.WindowStaysOnTopHint)
@@ -56,7 +71,7 @@ def _build_splash() -> QSplashScreen:
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("JobTracker")
-    app.setStyleSheet(FLUENT_DARK)
+    app.setStyleSheet(FLUENT_LIGHT)
     app.setFont(QFont("Helvetica Neue", 13))
 
     init_db()
