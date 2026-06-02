@@ -93,6 +93,12 @@ def _run_thread(run_id: int, stop_evt: threading.Event) -> None:
     dry_run      = bool(run["dry_run"])
     send_careers = bool(run["send_to_careers"])
 
+    # target_ids: if set, only process those specific application IDs
+    try:
+        target_ids = set(json.loads(run["target_ids"] or "[]"))
+    except Exception:
+        target_ids = set()
+
     _set_run(run_id, status="running", started_at=datetime.utcnow().isoformat())
 
     p = _profile()
@@ -105,13 +111,25 @@ def _run_thread(run_id: int, stop_evt: threading.Event) -> None:
         # Only fetch apps that have a contact email — avoids an infinite loop
         # where no-email apps are claimed, released to pending, and claimed again.
         conn = get_db()
-        rows = conn.execute(
-            "SELECT id FROM applications "
-            "WHERE status='pending' "
-            "  AND contact_email IS NOT NULL "
-            "  AND trim(contact_email) != '' "
-            "ORDER BY id ASC"
-        ).fetchall()
+        if target_ids:
+            placeholders = ",".join("?" * len(target_ids))
+            rows = conn.execute(
+                f"SELECT id FROM applications "
+                f"WHERE status='pending' "
+                f"  AND contact_email IS NOT NULL "
+                f"  AND trim(contact_email) != '' "
+                f"  AND id IN ({placeholders}) "
+                f"ORDER BY id ASC",
+                list(target_ids),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id FROM applications "
+                "WHERE status='pending' "
+                "  AND contact_email IS NOT NULL "
+                "  AND trim(contact_email) != '' "
+                "ORDER BY id ASC"
+            ).fetchall()
         pending_ids = [r["id"] for r in rows]
         conn.close()
 
@@ -162,11 +180,16 @@ def _run_thread(run_id: int, stop_evt: threading.Event) -> None:
             position = (app["position"] or "").strip()
             intro    = generate_personalized_intro(company_name=company,
                                                    short_desc=app["notes"] or "")
-            from modules.apple_mail_sender import generate_subject
+            from modules.apple_mail_sender import generate_subject, draft_fingerprint
             subject  = generate_subject(company or "your company", position,
                                         p["name"], p.get("role", ""))
             body = build_email_body(company, intro, position)
             tkey = _tkey(subject)
+            fp   = draft_fingerprint(raw_email, company)
+
+            # Audit log — one line per email so every send is fully traceable
+            print(f"[CAMPAIGN run#{run_id}] app_id={claimed_id} fingerprint={fp} "
+                  f"company={company!r} to={to_emails}")
 
             if dry_run:
                 print(f"[DRY RUN run#{run_id}] To: {to_emails} | Sender: {account} | {subject}")

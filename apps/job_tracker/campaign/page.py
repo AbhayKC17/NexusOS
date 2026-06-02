@@ -682,6 +682,10 @@ class CampaignPage(QWidget):
         ).fetchall()
         conn.close()
 
+        # Preserve checked IDs by application ID (not row position) before
+        # reassigning rows — prevents check-state drift when rows shift.
+        checked_ids = set(self._checked_ids())
+
         n = len(rows)
         self.table.setRowCount(n)
         self.table.blockSignals(True)
@@ -689,17 +693,20 @@ class CampaignPage(QWidget):
         for i, (aid, co, em, st) in enumerate(rows):
             self.table.setRowHeight(i, 36)
 
-            chk = self.table.item(i, 0)
-            if chk is None:
-                chk = QTableWidgetItem()
-                chk.setCheckState(Qt.CheckState.Unchecked)
-                chk.setFlags(
-                    Qt.ItemFlag.ItemIsUserCheckable |
-                    Qt.ItemFlag.ItemIsEnabled |
-                    Qt.ItemFlag.ItemIsSelectable
-                )
-                self.table.setItem(i, 0, chk)
+            # Always create a fresh checkbox item so the check state is tied
+            # to the application ID, not the row index.
+            chk = QTableWidgetItem()
+            chk.setCheckState(
+                Qt.CheckState.Checked if aid in checked_ids
+                else Qt.CheckState.Unchecked
+            )
             chk.setData(Qt.ItemDataRole.UserRole, aid)
+            chk.setFlags(
+                Qt.ItemFlag.ItemIsUserCheckable |
+                Qt.ItemFlag.ItemIsEnabled |
+                Qt.ItemFlag.ItemIsSelectable
+            )
+            self.table.setItem(i, 0, chk)
 
             for j, v in enumerate([co or "—", em or "—", st or "pending"]):
                 existing = self.table.item(i, j + 1)
@@ -1027,13 +1034,15 @@ class CampaignPage(QWidget):
             )
             conn.commit()
 
+        import json as _json
         run_name = f"Run {datetime.now().strftime('%H:%M')} via {via[:20]}"
         conn.execute("""
             INSERT INTO campaign_runs
                 (name, sender_mode, apple_mail_account, sleep_seconds,
-                 send_to_careers, dry_run, status)
-            VALUES (?, ?, ?, ?, 0, ?, 'pending')
-        """, (run_name, mode, apple_acct, delay, int(dry)))
+                 send_to_careers, dry_run, status, target_ids)
+            VALUES (?, ?, ?, ?, 0, ?, 'pending', ?)
+        """, (run_name, mode, apple_acct, delay, int(dry),
+              _json.dumps(checked) if checked else '[]'))
         run_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.commit()
         conn.close()

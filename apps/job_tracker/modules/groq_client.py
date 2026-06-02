@@ -310,8 +310,10 @@ def draft_single_email(
 
             # Sanity check: body must mention the company name, not just the sender's
             if company.split()[0].lower() in body.lower():
+                from modules.apple_mail_sender import draft_fingerprint
                 return {"email": email, "company": company,
-                        "subject": subject, "body": body}
+                        "subject": subject, "body": body,
+                        "fingerprint": draft_fingerprint(email, company)}
     except Exception:
         pass
 
@@ -353,9 +355,11 @@ def draft_single_email(
                     if not d.get("subject"):
                         from modules.apple_mail_sender import generate_subject
                         d["subject"] = generate_subject(company, "", name, role)
+                    from modules.apple_mail_sender import draft_fingerprint
                     return {"email": email, "company": company,
                             "subject": d["subject"],
-                            "body":    body}
+                            "body":    body,
+                            "fingerprint": draft_fingerprint(email, company)}
                 break
             except ValueError as err:
                 msg = str(err)
@@ -366,17 +370,17 @@ def draft_single_email(
                     break
 
     # ── 3. Template fallback (always correct) ─────────────────────────────────
-    from modules.apple_mail_sender import build_email_body
+    from modules.apple_mail_sender import build_email_body, generate_subject, draft_fingerprint
     intro = (
         f"I came across {company} and your work aligns strongly with my "
         f"background in {pitch or 'product and operations'}."
     )
-    from modules.apple_mail_sender import generate_subject
     return {
-        "email":   email,
-        "company": company,
-        "subject": generate_subject(company, "", name, role),
-        "body":    build_email_body(company, intro),
+        "email":       email,
+        "company":     company,
+        "subject":     generate_subject(company, "", name, role),
+        "body":        build_email_body(company, intro),
+        "fingerprint": draft_fingerprint(email, company),
     }
 
 

@@ -55,9 +55,10 @@ class _DraftCard(QFrame):
 
     def __init__(self, d: dict, index: int, parent=None):
         super().__init__(parent)
-        self.index   = index
-        self._email  = d.get("email", "")
-        self._company = d.get("company", "")
+        self.index        = index
+        self._email       = d.get("email", "")
+        self._company     = d.get("company", "")
+        self._fingerprint = d.get("fingerprint", "")
         self.setObjectName("card")
 
         lay = QVBoxLayout(self)
@@ -121,10 +122,11 @@ class _DraftCard(QFrame):
         if not self.includeChk.isChecked():
             return None
         return {
-            "email":   self._email,
-            "company": self._company,
-            "subject": self.subjEdit.text().strip(),
-            "body":    self.bodyEdit.toPlainText().strip(),
+            "email":       self._email,
+            "company":     self._company,
+            "subject":     self.subjEdit.text().strip(),
+            "body":        self.bodyEdit.toPlainText().strip(),
+            "fingerprint": self._fingerprint,
         }
 
 
@@ -557,6 +559,19 @@ class _AIBatchSendWorker(QThread):
                 errors.append(f"{email}: draft had an error — skipped")
                 self.progress.emit(email, False)
                 continue
+
+            # Fingerprint guard — verify the draft's (email, company) pair hasn't
+            # drifted since the draft was created (catches any accidental swap).
+            stored_fp = d.get("fingerprint", "")
+            if stored_fp:
+                from modules.apple_mail_sender import draft_fingerprint
+                if draft_fingerprint(email, company) != stored_fp:
+                    errors.append(
+                        f"{email}: fingerprint mismatch — draft was built for a "
+                        f"different recipient, skipped for safety"
+                    )
+                    self.progress.emit(email, False)
+                    continue
 
             tkey = subject_to_tracking_key(subject)
 

@@ -129,6 +129,7 @@ def init_db():
         "ALTER TABLE applications ADD COLUMN extra_columns TEXT",
         "ALTER TABLE applications ADD COLUMN tkey TEXT",
         "ALTER TABLE applications ADD COLUMN campaign_run_id INTEGER",
+        "ALTER TABLE campaign_runs ADD COLUMN target_ids TEXT DEFAULT '[]'",
         """CREATE TABLE IF NOT EXISTS inbox_index (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             message_uid     TEXT    UNIQUE,

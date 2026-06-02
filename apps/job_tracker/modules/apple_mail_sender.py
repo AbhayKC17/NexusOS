@@ -43,6 +43,16 @@ _SUBJ_NO_POS = [
 ]
 
 
+def draft_fingerprint(email: str, company: str) -> str:
+    """
+    Deterministic 16-char hex that ties exactly one email address to one company.
+    Stamped on every draft at creation and verified before any send — if the
+    email/company pair drifts at any point the mismatch is caught before sending.
+    """
+    key = f"{(email or '').lower().strip()}|{(company or '').lower().strip()}"
+    return _hashlib.sha256(key.encode()).hexdigest()[:16]
+
+
 def generate_subject(company: str, position: str = "",
                      sender_name: str = "", sender_role: str = "") -> str:
     idx = int(_hashlib.md5((company or "").lower().encode()).hexdigest(), 16)
@@ -399,8 +409,12 @@ def run_bulk_campaign(
             subject = generate_subject(company or "your company", position,
                                        p["name"], p["role"])
             body    = build_email_body(company, intro, position)
+            fp      = draft_fingerprint(raw_email, company)
 
             tracking_key = _subject_to_key(subject)
+
+            print(f"[CAMPAIGN] app_id={app_id} fingerprint={fp} "
+                  f"company={company!r} to={to_emails}")
 
             if dry_run:
                 print(f"[DRY RUN] To: {to_emails} | Subject: {subject} | Sender: {sender_mode}")
